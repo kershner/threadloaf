@@ -14,6 +14,7 @@ class Threadweaver {
   private appContainer: HTMLElement | null = null;
   private threadContainer: HTMLElement | null = null;
   private observer: MutationObserver | null = null;
+  private headerObserver: MutationObserver | null = null;
 
   constructor() {
     console.log('Threadweaver: Initializing...');
@@ -28,6 +29,7 @@ class Threadweaver {
       return;
     }
     this.injectStyles();
+    this.setupHeaderObserver();
     this.setupMutationObserver();
     this.setupPolling();
   }
@@ -200,9 +202,12 @@ class Threadweaver {
     this.threadContainer.style.display = 'none';
     const parentElement = this.threadContainer.parentElement;
     if (parentElement) {
-      parentElement.style.position = 'relative'; // Ensure parent can handle absolute positioning
+      parentElement.style.position = 'relative';
       parentElement.appendChild(threadweaverContainer);
     }
+
+    // Try to hide header again after rendering
+    this.findAndHideHeader();
   }
 
   // Create a message element
@@ -308,6 +313,7 @@ class Threadweaver {
     const styles = `
       #threadweaver-container {
         padding: 16px;
+        padding-bottom: 100px; /* Extra padding for the text input */
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         background: #000000;
         color: #ffffff;
@@ -315,9 +321,16 @@ class Threadweaver {
         top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
+        bottom: 16px;
         overflow-y: scroll;
         overflow-x: hidden;
+        z-index: 0; /* Ensure we're below the text input */
+      }
+
+      /* Find the parent that contains our container and the text input */
+      div[class*="chat_"] {
+        position: relative !important;
+        height: 100% !important;
       }
 
       #threadweaver-container::-webkit-scrollbar {
@@ -394,6 +407,35 @@ class Threadweaver {
     const styleElement = document.createElement('style');
     styleElement.textContent = styles;
     document.head.appendChild(styleElement);
+  }
+
+  private setupHeaderObserver(): void {
+    // Initial attempt to hide header
+    this.findAndHideHeader();
+
+    // Keep watching for header changes
+    this.headerObserver = new MutationObserver(() => {
+      this.findAndHideHeader();
+    });
+
+    this.headerObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  private findAndHideHeader(): void {
+    const headers = document.querySelectorAll('div[class*=" "]');
+    for (const header of Array.from(headers)) {
+      const classes = Array.from(header.classList);
+      const hasContainerClass = classes.some(cls => cls.startsWith('container_'));
+      const hasHeaderClass = classes.some(cls => cls.startsWith('header_'));
+      if (hasContainerClass && hasHeaderClass && header instanceof HTMLElement) {
+        header.style.display = 'none';
+        console.log('Threadweaver: Found and hid channel header');
+        break;
+      }
+    }
   }
 }
 

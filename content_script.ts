@@ -180,6 +180,33 @@ class Threadweaver {
 
     // Parse messages and build tree
     const rawMessages = this.parseMessages();
+    
+    // Sort messages by timestamp for color grading
+    const sortedMessages = [...rawMessages].sort((a, b) => b.timestamp - a.timestamp);
+    const messageColors = new Map<string, string>();
+    const messageBold = new Map<string, boolean>();
+    
+    // Set colors for the newest 15 messages
+    const baseGray = 128; // Medium gray
+    const numGradientMessages = Math.min(15, sortedMessages.length);
+    
+    sortedMessages.forEach((msg, index) => {
+      if (index === 0) {
+        // Newest message gets white and bold
+        messageColors.set(msg.id, 'rgb(255, 255, 255)');
+        messageBold.set(msg.id, true);
+      } else if (index < numGradientMessages) {
+        // Next 14 messages get gradient from just above medium gray to near-white
+        const colorValue = Math.floor(baseGray + ((255 - baseGray) * (numGradientMessages - index) / numGradientMessages));
+        messageColors.set(msg.id, `rgb(${colorValue}, ${colorValue}, ${colorValue})`);
+        messageBold.set(msg.id, false);
+      } else {
+        // Older messages get medium gray
+        messageColors.set(msg.id, `rgb(${baseGray}, ${baseGray}, ${baseGray})`);
+        messageBold.set(msg.id, false);
+      }
+    });
+
     const rootMessages = this.buildMessageTree(rawMessages);
 
     // Clear existing container and append new content
@@ -187,7 +214,7 @@ class Threadweaver {
 
     const renderMessages = (messages: MessageInfo[], depth = 0) => {
       for (const message of messages) {
-        const el = this.createMessageElement(message, depth);
+        const el = this.createMessageElement(message, depth, messageColors.get(message.id) || '', messageBold.get(message.id) || false);
         threadweaverContainer.appendChild(el);
 
         if (message.children) {
@@ -211,7 +238,7 @@ class Threadweaver {
   }
 
   // Create a message element
-  private createMessageElement(message: MessageInfo, depth: number): HTMLElement {
+  private createMessageElement(message: MessageInfo, depth: number, color: string, isBold: boolean): HTMLElement {
     const el = document.createElement('div');
     el.classList.add('threadweaver-message');
     el.style.marginLeft = `${depth * 20}px`;
@@ -223,6 +250,10 @@ class Threadweaver {
     const contentPreview = document.createElement('span');
     contentPreview.classList.add('message-content', 'preview');
     contentPreview.textContent = message.content;
+    contentPreview.style.color = color;
+    if (isBold) {
+      contentPreview.style.fontWeight = 'bold';
+    }
     
     const separator = document.createElement('span');
     separator.classList.add('separator');
@@ -239,7 +270,31 @@ class Threadweaver {
     // Full content container (shown when expanded)
     const fullContentContainer = document.createElement('div');
     fullContentContainer.classList.add('full-content');
-    fullContentContainer.innerHTML = message.htmlContent;
+
+    // Add username header and reply button container
+    const headerContainer = document.createElement('div');
+    headerContainer.classList.add('expanded-header');
+    
+    const expandedAuthor = document.createElement('span');
+    expandedAuthor.classList.add('expanded-author');
+    expandedAuthor.textContent = message.author;
+    
+    const replyButton = document.createElement('button');
+    replyButton.classList.add('reply-button');
+    replyButton.textContent = 'Reply';
+    replyButton.onclick = (e) => {
+      e.stopPropagation(); // Prevent collapsing when clicking reply
+    };
+    
+    headerContainer.appendChild(expandedAuthor);
+    headerContainer.appendChild(replyButton);
+    
+    const messageContent = document.createElement('div');
+    messageContent.classList.add('message-content-expanded');
+    messageContent.innerHTML = message.htmlContent;
+    
+    fullContentContainer.appendChild(headerContainer);
+    fullContentContainer.appendChild(messageContent);
     fullContentContainer.style.display = 'none';
     
     el.appendChild(previewContainer);
@@ -378,13 +433,42 @@ class Threadweaver {
         min-height: 1.4em;
       }
 
-      .full-content {
+      .expanded-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         padding: 10px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .expanded-author {
+        color: #f3e7b5;
+        font-weight: bold;
+        font-size: 1.1em;
+      }
+
+      .reply-button {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #ffffff;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background 0.2s ease;
+      }
+
+      .reply-button:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .message-content-expanded {
+        padding: 16px 12px;
         white-space: normal;
         line-height: 1.4;
       }
 
-      .full-content img {
+      .message-content-expanded img {
         max-width: 100%;
         height: auto;
       }

@@ -622,6 +622,11 @@ class Threadweaver {
         el.dataset.msgId = message.id;
 
         el.addEventListener("click", () => {
+            // If already expanded, do nothing
+            if (el.classList.contains("expanded")) {
+                return;
+            }
+
             // Collapse any other expanded messages first
             document.querySelectorAll(".threadweaver-message.expanded").forEach((expandedEl) => {
                 if (expandedEl !== el) {
@@ -633,10 +638,10 @@ class Threadweaver {
                 }
             });
 
-            // Toggle this message
-            const isExpanded = el.classList.toggle("expanded");
-            previewContainer.style.display = isExpanded ? "none" : "flex";
-            fullContentContainer.style.display = isExpanded ? "block" : "none";
+            // Expand this message
+            el.classList.add("expanded");
+            previewContainer.style.display = "none";
+            fullContentContainer.style.display = "block";
         });
 
         return el;

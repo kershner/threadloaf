@@ -20,7 +20,7 @@ div[class*="chat_"] {
 }
 
 .message-thread {
-    margin-left: 20px;
+    /* margin-left is now handled entirely by the exponential decay in JS */
 }
 
 .thread-container {

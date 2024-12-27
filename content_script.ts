@@ -288,81 +288,74 @@ class Threadweaver {
         // Sort messages chronologically for processing
         const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
 
+        // Track which messages have been coalesced
+        const coalescedIds = new Set<string>();
+
         // Initialize all messages in the map
         for (const message of sortedMessages) {
             message.children = [];
             idToMessage.set(message.id, message);
         }
 
-        // Track the last reply's parent for implied relationships
-        let lastReplyParentId: string | undefined = undefined;
-        let lastReplyTimestamp: number = 0;
-        const ONE_MINUTE = 60 * 1000; // milliseconds
-        const SILENCE_BREAK_THRESHOLD = 10 * 60 * 1000; // milliseconds
+        const THIRTY_SECONDS = 30 * 1000; // milliseconds
+        const THREE_MINUTES = 3 * 60 * 1000; // milliseconds
 
-        // Track silence break heuristic
-        let lastMessageTimestamp: number = 0;
-        let silenceBreakMessageId: string | undefined = undefined;
-        let silenceBreakTimestamp: number = 0;
-        let silenceBreakActive = false;
+        // First pass: coalesce same-user messages
+        for (let i = 1; i < sortedMessages.length; i++) {
+            const message = sortedMessages[i];
+            const prevMessage = sortedMessages[i - 1];
+            const timeDiff = message.timestamp - prevMessage.timestamp;
 
-        // Build the tree by linking children to parents
+            if (
+                !message.parentId && // Not an explicit reply
+                !coalescedIds.has(message.id) && // Not already coalesced
+                message.author === prevMessage.author && // Same author
+                timeDiff <= THIRTY_SECONDS
+            ) {
+                // Within 30 seconds
+
+                // Coalesce this message into the previous one
+                prevMessage.htmlContent += `<br><br>${message.htmlContent}`;
+                prevMessage.content += ` ${message.content}`;
+                coalescedIds.add(message.id);
+                console.log(`Threadweaver: Coalesced message ${message.id} into ${prevMessage.id}`);
+            }
+        }
+
+        // Second pass: build the tree with remaining messages
         for (const message of sortedMessages) {
+            // Skip coalesced messages
+            if (coalescedIds.has(message.id)) {
+                continue;
+            }
+
             let effectiveParentId = message.parentId;
 
-            // Check for silence break
-            const timeSinceLastMessage = message.timestamp - lastMessageTimestamp;
-            if (timeSinceLastMessage >= SILENCE_BREAK_THRESHOLD) {
-                // This message breaks a long silence
-                silenceBreakMessageId = message.id;
-                silenceBreakTimestamp = message.timestamp;
-                silenceBreakActive = true;
-                console.log(
-                    `Threadweaver: Silence break detected - Message ${message.id} breaks ${timeSinceLastMessage / 1000}s silence`,
-                );
-            }
-
-            // If this message has no explicit parent, check for implied relationships
+            // If this is not an explicit reply, try to find an implicit parent
             if (!effectiveParentId) {
-                if (lastReplyParentId) {
-                    // Check recent reply heuristic
-                    const timeSinceLastReply = message.timestamp - lastReplyTimestamp;
-                    if (timeSinceLastReply <= ONE_MINUTE) {
-                        // Within one minute of last reply, use the same parent
-                        effectiveParentId = lastReplyParentId;
-                        console.log(
-                            `Threadweaver: Implied parent (recent reply) - Message ${message.id} -> Parent ${lastReplyParentId}`,
-                        );
-                    }
-                } else if (silenceBreakActive) {
-                    // Check silence break heuristic
-                    const timeSinceSilenceBreak = message.timestamp - silenceBreakTimestamp;
-                    if (timeSinceSilenceBreak <= ONE_MINUTE) {
-                        effectiveParentId = silenceBreakMessageId;
-                        console.log(
-                            `Threadweaver: Implied parent (silence break) - Message ${message.id} -> Parent ${silenceBreakMessageId}`,
-                        );
-                    }
-                }
-            }
+                // Look for any recent message within 3 minutes
+                const recentMessage = sortedMessages
+                    .slice(0, sortedMessages.indexOf(message))
+                    .reverse()
+                    .find((m) => {
+                        const timeDiff = message.timestamp - m.timestamp;
+                        return timeDiff <= THREE_MINUTES && !coalescedIds.has(m.id);
+                    });
 
-            // Update tracking
-            if (message.parentId) {
-                // If this is an explicit reply, update reply tracking
-                lastReplyParentId = message.parentId;
-                lastReplyTimestamp = message.timestamp;
-                // If within the silence break window, this explicit reply ends the silence break heuristic
-                if (silenceBreakActive && message.timestamp - silenceBreakTimestamp <= ONE_MINUTE) {
-                    console.log(`Threadweaver: Silence break ended by explicit reply - Message ${message.id}`);
-                    silenceBreakActive = false;
+                if (recentMessage) {
+                    effectiveParentId = recentMessage.id;
+                    console.log(
+                        `Threadweaver: Found recent parent within 3 minutes - Message ${message.id} -> Parent ${recentMessage.id}`,
+                    );
+                } else {
+                    console.log(`Threadweaver: No recent parent found for message ${message.id}, treating as root`);
                 }
             }
-            lastMessageTimestamp = message.timestamp;
 
             // Link message to its parent (explicit or implied)
             if (effectiveParentId) {
                 const parent = idToMessage.get(effectiveParentId);
-                if (parent) {
+                if (parent && !coalescedIds.has(effectiveParentId)) {
                     parent.children?.push(message);
                     // Ensure the message retains its parent ID even after being added to children
                     message.parentId = effectiveParentId;
@@ -488,7 +481,21 @@ class Threadweaver {
     ): HTMLElement {
         const el = document.createElement("div");
         el.classList.add("threadweaver-message");
-        el.style.marginLeft = `${depth * 20}px`;
+
+        // Calculate indent using exponential decay
+        const MAX_INDENT = 350;
+        const FIRST_LEVEL_INDENT = 40;
+        // Solve for decay rate: FIRST_LEVEL_INDENT = MAX_INDENT * (1 - e^(-DECAY_RATE))
+        const DECAY_RATE = -Math.log(1 - FIRST_LEVEL_INDENT / MAX_INDENT);
+        const indent = Math.round(MAX_INDENT * (1 - Math.exp(-DECAY_RATE * depth)));
+        console.log(`Threadweaver: Indent calculation for depth ${depth}:`, {
+            formula: `${MAX_INDENT} * (1 - e^(-${DECAY_RATE} * ${depth}))`,
+            expValue: Math.exp(-DECAY_RATE * depth),
+            multiplier: 1 - Math.exp(-DECAY_RATE * depth),
+            result: indent,
+            firstLevelTarget: FIRST_LEVEL_INDENT,
+        });
+        el.style.marginLeft = `${indent}px`;
 
         // Preview container (always visible)
         const previewContainer = document.createElement("div");

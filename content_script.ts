@@ -1,693 +1,714 @@
 // content_script.ts
 
 interface MessageInfo {
-  id: string;
-  author: string;
-  timestamp: number; // Unix timestamp in milliseconds
-  content: string;
-  htmlContent: string;
-  parentId?: string; // Parent message ID (if reply)
-  children?: MessageInfo[]; // List of child messages
+    id: string;
+    author: string;
+    timestamp: number; // Unix timestamp in milliseconds
+    content: string;
+    htmlContent: string;
+    parentId?: string; // Parent message ID (if reply)
+    children?: MessageInfo[]; // List of child messages
 }
 
 class Threadweaver {
-  private appContainer: HTMLElement | null = null;
-  private threadContainer: HTMLElement | null = null;
-  private observer: MutationObserver | null = null;
-  private headerObserver: MutationObserver | null = null;
+    private appContainer: HTMLElement | null = null;
+    private threadContainer: HTMLElement | null = null;
+    private observer: MutationObserver | null = null;
+    private headerObserver: MutationObserver | null = null;
 
-  constructor() {
-    console.log('Threadweaver: Initializing...');
-    this.initialize();
-  }
-
-  // Entry point for initialization
-  private initialize(): void {
-    this.appContainer = this.findAppContainer();
-    if (!this.appContainer) {
-      console.error('Threadweaver: Failed to find app container. Aborting initialization.');
-      return;
+    constructor() {
+        console.log("Threadweaver: Initializing...");
+        this.initialize();
     }
-    this.injectStyles();
-    this.setupHeaderObserver();
-    this.setupMutationObserver();
-    this.setupPolling();
-  }
 
-  // Locate the top-level app container
-  private findAppContainer(): HTMLElement | null {
-    return document.querySelector('#app-mount');
-  }
-
-  // Locate the thread container dynamically
-  private findThreadContainer(): HTMLElement | null {
-    const elements = document.querySelectorAll<HTMLElement>('ol[class^="scrollerInner_"]');
-    const threadContainer = Array.from(elements).find(el => {
-      return el.getAttribute('data-list-id') === 'chat-messages' && el.children.length > 0;
-    }) || null;
-    
-    if (threadContainer) {
-      // Find and disable scrolling on the original scroller
-      const scrollerElement = threadContainer.closest('div[class*="scroller_"]');
-      if (scrollerElement) {
-        const scrollerClass = Array.from(scrollerElement.classList)
-          .find(className => className.startsWith('scroller_'));
-        if (scrollerClass) {
-          // Add the class to our styles to disable its scrolling
-          this.addScrollerStyle(scrollerClass);
+    // Entry point for initialization
+    private initialize(): void {
+        this.appContainer = this.findAppContainer();
+        if (!this.appContainer) {
+            console.error("Threadweaver: Failed to find app container. Aborting initialization.");
+            return;
         }
-      }
+        this.injectStyles();
+        this.setupHeaderObserver();
+        this.setupMutationObserver();
+        this.setupPolling();
     }
-    
-    return threadContainer;
-  }
 
-  private addScrollerStyle(scrollerClass: string): void {
-    const style = document.createElement('style');
-    style.textContent = `
+    // Locate the top-level app container
+    private findAppContainer(): HTMLElement | null {
+        return document.querySelector("#app-mount");
+    }
+
+    // Locate the thread container dynamically
+    private findThreadContainer(): HTMLElement | null {
+        const elements = document.querySelectorAll<HTMLElement>('ol[class^="scrollerInner_"]');
+        const threadContainer =
+            Array.from(elements).find((el) => {
+                return el.getAttribute("data-list-id") === "chat-messages" && el.children.length > 0;
+            }) || null;
+
+        if (threadContainer) {
+            // Find and disable scrolling on the original scroller
+            const scrollerElement = threadContainer.closest('div[class*="scroller_"]');
+            if (scrollerElement) {
+                const scrollerClass = Array.from(scrollerElement.classList).find((className) =>
+                    className.startsWith("scroller_"),
+                );
+                if (scrollerClass) {
+                    // Add the class to our styles to disable its scrolling
+                    this.addScrollerStyle(scrollerClass);
+                }
+            }
+        }
+
+        return threadContainer;
+    }
+
+    private addScrollerStyle(scrollerClass: string): void {
+        const style = document.createElement("style");
+        style.textContent = `
       div.${scrollerClass} {
         overflow-y: hidden !important;
       }
     `;
-    document.head.appendChild(style);
-  }
+        document.head.appendChild(style);
+    }
 
-  // Parse all messages in the thread container
-  private parseMessages(): MessageInfo[] {
-    if (!this.threadContainer) return [];
+    // Parse all messages in the thread container
+    private parseMessages(): MessageInfo[] {
+        if (!this.threadContainer) return [];
 
-    const messages = Array.from(this.threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map((el) => {
-      const id = el.id.split('-').pop() || '';
-      console.log(`Threadweaver: Processing message ${id}`);
+        const messages = Array.from(this.threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map((el) => {
+            const id = el.id.split("-").pop() || "";
+            console.log(`Threadweaver: Processing message ${id}`);
 
-      const contentsEl = el.querySelector('[class^="contents_"]');
-      if (!contentsEl) {
-        console.log('el', el);
-        throw new Error('Failed to find contents element. Aborting message parsing.');
-      }
-
-      const headerEl = contentsEl.querySelector('[class^="header_"]');
-      if (!headerEl) {
-        console.log('contentsEl', contentsEl);
-        throw new Error('Failed to find header element. Aborting message parsing.');
-      }
-
-      const author = headerEl.querySelector('[id^="message-username-"] > span[class^="username_"]')?.textContent?.trim();
-      if (!author) {
-        console.log('headerEl', headerEl);
-        throw new Error('Failed to find author element. Aborting message parsing.');
-      }
-
-      const timestampEl = headerEl.querySelector('time');
-      if (!timestampEl) {
-        console.log('headerEl', headerEl);
-        throw new Error('Failed to find timestamp element. Aborting message parsing.');
-      }
-
-      const dateTime = timestampEl.getAttribute('datetime');
-      if (!dateTime) {
-        console.log('timestampEl', timestampEl);
-        throw new Error('Failed to find datetime attribute. Aborting message parsing.');
-      }
-
-      const timestamp = new Date(dateTime).getTime();
-
-      const messageContentEl = contentsEl.querySelector('[id^="message-content-"]');
-      if (!messageContentEl) {
-        console.log('contentsEl', contentsEl);
-        throw new Error('Failed to find message content element. Aborting message parsing.');
-      }
-
-      // Find accessories/embeds container
-      const accessoriesId = `message-accessories-${id}`;
-      const accessoriesEl = el.querySelector(`#${accessoriesId}`);
-      console.log(`Threadweaver: Looking for accessories with ID ${accessoriesId}`, accessoriesEl);
-
-      // Debug image detection in both content and accessories
-      const contentImages = messageContentEl.querySelectorAll('img');
-      const accessoryImages = accessoriesEl ? accessoriesEl.querySelectorAll('img') : [];
-      const totalImages = contentImages.length + accessoryImages.length;
-      
-      console.log(`Threadweaver: Found ${totalImages} total images in message ${id}:`, {
-        contentImages: contentImages.length,
-        accessoryImages: accessoryImages.length
-      });
-
-      // Log details for all images
-      [...contentImages, ...accessoryImages].forEach((img, idx) => {
-        console.log(`Threadweaver: Image ${idx + 1}/${totalImages}:`, {
-          src: img.src,
-          'aria-label': img.getAttribute('aria-label'),
-          class: img.className,
-          width: img.width,
-          height: img.height,
-          container: img.closest('#' + accessoriesId) ? 'accessories' : 'content'
-        });
-      });
-
-      // Get text content for preview, handling image-only messages
-      let textContent = messageContentEl.textContent || '';
-      if (!textContent) {
-        if (totalImages > 0) {
-          textContent = '🖼️ Image';
-        } else if (accessoriesEl) {
-          const links = accessoriesEl.querySelectorAll('a[href]');
-          if (links.length > 0) {
-            textContent = '🔗 Link';
-          }
-        }
-        console.log(`Threadweaver: Message ${id} is media-only`);
-      }
-
-      // Clone both content and accessories
-      const contentClone = messageContentEl.cloneNode(true) as HTMLElement;
-      let fullContent = contentClone;
-
-      if (accessoriesEl) {
-        // Convert embeds to plain text links
-        const links = Array.from(accessoriesEl.querySelectorAll<HTMLAnchorElement>('a[href]')).map(a => a.href);
-        const images = Array.from(accessoriesEl.querySelectorAll<HTMLImageElement>('img[src]')).map(img => img.src);
-        
-        // Create a container for content and links
-        const container = document.createElement('div');
-        container.appendChild(contentClone);
-
-        // Add all unique links
-        const uniqueLinks = [...new Set([...links, ...images])];
-        if (uniqueLinks.length > 0) {
-          const linkList = document.createElement('div');
-          linkList.classList.add('embed-links');
-          
-          uniqueLinks.forEach(url => {
-            const link = document.createElement('a');
-            link.href = url;
-            // Truncate long URLs
-            if (url.length > 70) {
-              const start = url.slice(0, 35);
-              const end = url.slice(-30);
-              link.textContent = `${start}...${end}`;
-              link.title = url; // Show full URL on hover
-            } else {
-              link.textContent = url;
+            const contentsEl = el.querySelector('[class^="contents_"]');
+            if (!contentsEl) {
+                console.log("el", el);
+                throw new Error("Failed to find contents element. Aborting message parsing.");
             }
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            
-            const linkContainer = document.createElement('div');
-            linkContainer.appendChild(link);
-            linkList.appendChild(linkContainer);
-          });
-          
-          container.appendChild(linkList);
-        }
-        
-        fullContent = container;
-        console.log(`Threadweaver: Converted embeds to ${uniqueLinks.length} links for message ${id}`);
-      }
 
-      // Fix all image sources in the cloned content
-      fullContent.querySelectorAll('img').forEach((img, idx) => {
-        const originalSrc = img.src;
-        if (img.src) {
-          img.src = img.src; // Force a re-assignment to resolve any relative URLs
-          console.log(`Threadweaver: Processed image ${idx + 1} src:`, {
-            original: originalSrc,
-            new: img.src
-          });
-        }
-        if (img.getAttribute('aria-label')) {
-          img.alt = img.getAttribute('aria-label') || '';
-          console.log(`Threadweaver: Copied aria-label to alt:`, img.alt);
-        }
-      });
+            const headerEl = contentsEl.querySelector('[class^="header_"]');
+            if (!headerEl) {
+                console.log("contentsEl", contentsEl);
+                throw new Error("Failed to find header element. Aborting message parsing.");
+            }
 
-      // Debug the final HTML content
-      console.log(`Threadweaver: Final HTML for message ${id}:`, fullContent.innerHTML);
+            const author = headerEl
+                .querySelector('[id^="message-username-"] > span[class^="username_"]')
+                ?.textContent?.trim();
+            if (!author) {
+                console.log("headerEl", headerEl);
+                throw new Error("Failed to find author element. Aborting message parsing.");
+            }
 
-      let parentId: string | undefined = undefined;
-      const replyContextMaybe = el.querySelector('[id^="message-reply-context-"]');
-      if (replyContextMaybe) {
-        const parentContentEl = replyContextMaybe.querySelector('[id^="message-content-"]');
-        parentId = parentContentEl?.id.split('-').pop() || '';
-        console.log(`Threadweaver: Found parent ID ${parentId} for message ${id}`);
-      }
+            const timestampEl = headerEl.querySelector("time");
+            if (!timestampEl) {
+                console.log("headerEl", headerEl);
+                throw new Error("Failed to find timestamp element. Aborting message parsing.");
+            }
 
-      return { 
-        id, 
-        author, 
-        timestamp, 
-        content: textContent,
-        htmlContent: fullContent.innerHTML,
-        parentId, 
-        children: [] 
-      };
-    });
+            const dateTime = timestampEl.getAttribute("datetime");
+            if (!dateTime) {
+                console.log("timestampEl", timestampEl);
+                throw new Error("Failed to find datetime attribute. Aborting message parsing.");
+            }
 
-    return messages;
-  }
+            const timestamp = new Date(dateTime).getTime();
 
-  // Build a hierarchical message tree
-  private buildMessageTree(messages: MessageInfo[]): MessageInfo[] {
-    const idToMessage = new Map<string, MessageInfo>();
-    const rootMessages: MessageInfo[] = [];
+            const messageContentEl = contentsEl.querySelector('[id^="message-content-"]');
+            if (!messageContentEl) {
+                console.log("contentsEl", contentsEl);
+                throw new Error("Failed to find message content element. Aborting message parsing.");
+            }
 
-    // Sort messages chronologically for processing
-    const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
+            // Find accessories/embeds container
+            const accessoriesId = `message-accessories-${id}`;
+            const accessoriesEl = el.querySelector(`#${accessoriesId}`);
+            console.log(`Threadweaver: Looking for accessories with ID ${accessoriesId}`, accessoriesEl);
 
-    // Initialize all messages in the map
-    for (const message of sortedMessages) {
-      message.children = [];
-      idToMessage.set(message.id, message);
+            // Debug image detection in both content and accessories
+            const contentImages = messageContentEl.querySelectorAll("img");
+            const accessoryImages = accessoriesEl ? accessoriesEl.querySelectorAll("img") : [];
+            const totalImages = contentImages.length + accessoryImages.length;
+
+            console.log(`Threadweaver: Found ${totalImages} total images in message ${id}:`, {
+                contentImages: contentImages.length,
+                accessoryImages: accessoryImages.length,
+            });
+
+            // Log details for all images
+            [...contentImages, ...accessoryImages].forEach((img, idx) => {
+                console.log(`Threadweaver: Image ${idx + 1}/${totalImages}:`, {
+                    src: img.src,
+                    "aria-label": img.getAttribute("aria-label"),
+                    class: img.className,
+                    width: img.width,
+                    height: img.height,
+                    container: img.closest("#" + accessoriesId) ? "accessories" : "content",
+                });
+            });
+
+            // Get text content for preview, handling image-only messages
+            let textContent = messageContentEl.textContent || "";
+            if (!textContent) {
+                if (totalImages > 0) {
+                    textContent = "🖼️ Image";
+                } else if (accessoriesEl) {
+                    const links = accessoriesEl.querySelectorAll("a[href]");
+                    if (links.length > 0) {
+                        textContent = "🔗 Link";
+                    }
+                }
+                console.log(`Threadweaver: Message ${id} is media-only`);
+            }
+
+            // Clone both content and accessories
+            const contentClone = messageContentEl.cloneNode(true) as HTMLElement;
+            let fullContent = contentClone;
+
+            if (accessoriesEl) {
+                // Convert embeds to plain text links
+                const links = Array.from(accessoriesEl.querySelectorAll<HTMLAnchorElement>("a[href]")).map(
+                    (a) => a.href,
+                );
+                const images = Array.from(accessoriesEl.querySelectorAll<HTMLImageElement>("img[src]")).map(
+                    (img) => img.src,
+                );
+
+                // Create a container for content and links
+                const container = document.createElement("div");
+                container.appendChild(contentClone);
+
+                // Add all unique links
+                const uniqueLinks = [...new Set([...links, ...images])];
+                if (uniqueLinks.length > 0) {
+                    const linkList = document.createElement("div");
+                    linkList.classList.add("embed-links");
+
+                    uniqueLinks.forEach((url) => {
+                        const link = document.createElement("a");
+                        link.href = url;
+                        // Truncate long URLs
+                        if (url.length > 70) {
+                            const start = url.slice(0, 35);
+                            const end = url.slice(-30);
+                            link.textContent = `${start}...${end}`;
+                            link.title = url; // Show full URL on hover
+                        } else {
+                            link.textContent = url;
+                        }
+                        link.target = "_blank";
+                        link.rel = "noopener noreferrer";
+
+                        const linkContainer = document.createElement("div");
+                        linkContainer.appendChild(link);
+                        linkList.appendChild(linkContainer);
+                    });
+
+                    container.appendChild(linkList);
+                }
+
+                fullContent = container;
+                console.log(`Threadweaver: Converted embeds to ${uniqueLinks.length} links for message ${id}`);
+            }
+
+            // Fix all image sources in the cloned content
+            fullContent.querySelectorAll("img").forEach((img, idx) => {
+                const originalSrc = img.src;
+                if (img.src) {
+                    img.src = img.src; // Force a re-assignment to resolve any relative URLs
+                    console.log(`Threadweaver: Processed image ${idx + 1} src:`, {
+                        original: originalSrc,
+                        new: img.src,
+                    });
+                }
+                if (img.getAttribute("aria-label")) {
+                    img.alt = img.getAttribute("aria-label") || "";
+                    console.log(`Threadweaver: Copied aria-label to alt:`, img.alt);
+                }
+            });
+
+            // Debug the final HTML content
+            console.log(`Threadweaver: Final HTML for message ${id}:`, fullContent.innerHTML);
+
+            let parentId: string | undefined = undefined;
+            const replyContextMaybe = el.querySelector('[id^="message-reply-context-"]');
+            if (replyContextMaybe) {
+                const parentContentEl = replyContextMaybe.querySelector('[id^="message-content-"]');
+                parentId = parentContentEl?.id.split("-").pop() || "";
+                console.log(`Threadweaver: Found parent ID ${parentId} for message ${id}`);
+            }
+
+            return {
+                id,
+                author,
+                timestamp,
+                content: textContent,
+                htmlContent: fullContent.innerHTML,
+                parentId,
+                children: [],
+            };
+        });
+
+        return messages;
     }
 
-    // Track the last reply's parent for implied relationships
-    let lastReplyParentId: string | undefined = undefined;
-    let lastReplyTimestamp: number = 0;
-    const ONE_MINUTE = 60 * 1000; // milliseconds
-    const SILENCE_BREAK_THRESHOLD = 10 * 60 * 1000; // milliseconds
+    // Build a hierarchical message tree
+    private buildMessageTree(messages: MessageInfo[]): MessageInfo[] {
+        const idToMessage = new Map<string, MessageInfo>();
+        const rootMessages: MessageInfo[] = [];
 
-    // Track silence break heuristic
-    let lastMessageTimestamp: number = 0;
-    let silenceBreakMessageId: string | undefined = undefined;
-    let silenceBreakTimestamp: number = 0;
-    let silenceBreakActive = false;
+        // Sort messages chronologically for processing
+        const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
 
-    // Build the tree by linking children to parents
-    for (const message of sortedMessages) {
-      let effectiveParentId = message.parentId;
-
-      // Check for silence break
-      const timeSinceLastMessage = message.timestamp - lastMessageTimestamp;
-      if (timeSinceLastMessage >= SILENCE_BREAK_THRESHOLD) {
-        // This message breaks a long silence
-        silenceBreakMessageId = message.id;
-        silenceBreakTimestamp = message.timestamp;
-        silenceBreakActive = true;
-        console.log(`Threadweaver: Silence break detected - Message ${message.id} breaks ${timeSinceLastMessage/1000}s silence`);
-      }
-
-      // If this message has no explicit parent, check for implied relationships
-      if (!effectiveParentId) {
-        if (lastReplyParentId) {
-          // Check recent reply heuristic
-          const timeSinceLastReply = message.timestamp - lastReplyTimestamp;
-          if (timeSinceLastReply <= ONE_MINUTE) {
-            // Within one minute of last reply, use the same parent
-            effectiveParentId = lastReplyParentId;
-            console.log(`Threadweaver: Implied parent (recent reply) - Message ${message.id} -> Parent ${lastReplyParentId}`);
-          }
-        } else if (silenceBreakActive) {
-          // Check silence break heuristic
-          const timeSinceSilenceBreak = message.timestamp - silenceBreakTimestamp;
-          if (timeSinceSilenceBreak <= ONE_MINUTE) {
-            effectiveParentId = silenceBreakMessageId;
-            console.log(`Threadweaver: Implied parent (silence break) - Message ${message.id} -> Parent ${silenceBreakMessageId}`);
-          }
+        // Initialize all messages in the map
+        for (const message of sortedMessages) {
+            message.children = [];
+            idToMessage.set(message.id, message);
         }
-      }
 
-      // Update tracking
-      if (message.parentId) {
-        // If this is an explicit reply, update reply tracking
-        lastReplyParentId = message.parentId;
-        lastReplyTimestamp = message.timestamp;
-        // If within the silence break window, this explicit reply ends the silence break heuristic
-        if (silenceBreakActive && message.timestamp - silenceBreakTimestamp <= ONE_MINUTE) {
-          console.log(`Threadweaver: Silence break ended by explicit reply - Message ${message.id}`);
-          silenceBreakActive = false;
-        }
-      }
-      lastMessageTimestamp = message.timestamp;
+        // Track the last reply's parent for implied relationships
+        let lastReplyParentId: string | undefined = undefined;
+        let lastReplyTimestamp: number = 0;
+        const ONE_MINUTE = 60 * 1000; // milliseconds
+        const SILENCE_BREAK_THRESHOLD = 10 * 60 * 1000; // milliseconds
 
-      // Link message to its parent (explicit or implied)
-      if (effectiveParentId) {
-        const parent = idToMessage.get(effectiveParentId);
-        if (parent) {
-          parent.children?.push(message);
-          // Ensure the message retains its parent ID even after being added to children
-          message.parentId = effectiveParentId;
-          console.log(`Threadweaver: Linked message ${message.id} to parent ${effectiveParentId}`);
-        } else {
-          console.log(`Threadweaver: Parent ${effectiveParentId} not found for message ${message.id}, treating as root`);
-          rootMessages.push(message);
+        // Track silence break heuristic
+        let lastMessageTimestamp: number = 0;
+        let silenceBreakMessageId: string | undefined = undefined;
+        let silenceBreakTimestamp: number = 0;
+        let silenceBreakActive = false;
+
+        // Build the tree by linking children to parents
+        for (const message of sortedMessages) {
+            let effectiveParentId = message.parentId;
+
+            // Check for silence break
+            const timeSinceLastMessage = message.timestamp - lastMessageTimestamp;
+            if (timeSinceLastMessage >= SILENCE_BREAK_THRESHOLD) {
+                // This message breaks a long silence
+                silenceBreakMessageId = message.id;
+                silenceBreakTimestamp = message.timestamp;
+                silenceBreakActive = true;
+                console.log(
+                    `Threadweaver: Silence break detected - Message ${message.id} breaks ${timeSinceLastMessage / 1000}s silence`,
+                );
+            }
+
+            // If this message has no explicit parent, check for implied relationships
+            if (!effectiveParentId) {
+                if (lastReplyParentId) {
+                    // Check recent reply heuristic
+                    const timeSinceLastReply = message.timestamp - lastReplyTimestamp;
+                    if (timeSinceLastReply <= ONE_MINUTE) {
+                        // Within one minute of last reply, use the same parent
+                        effectiveParentId = lastReplyParentId;
+                        console.log(
+                            `Threadweaver: Implied parent (recent reply) - Message ${message.id} -> Parent ${lastReplyParentId}`,
+                        );
+                    }
+                } else if (silenceBreakActive) {
+                    // Check silence break heuristic
+                    const timeSinceSilenceBreak = message.timestamp - silenceBreakTimestamp;
+                    if (timeSinceSilenceBreak <= ONE_MINUTE) {
+                        effectiveParentId = silenceBreakMessageId;
+                        console.log(
+                            `Threadweaver: Implied parent (silence break) - Message ${message.id} -> Parent ${silenceBreakMessageId}`,
+                        );
+                    }
+                }
+            }
+
+            // Update tracking
+            if (message.parentId) {
+                // If this is an explicit reply, update reply tracking
+                lastReplyParentId = message.parentId;
+                lastReplyTimestamp = message.timestamp;
+                // If within the silence break window, this explicit reply ends the silence break heuristic
+                if (silenceBreakActive && message.timestamp - silenceBreakTimestamp <= ONE_MINUTE) {
+                    console.log(`Threadweaver: Silence break ended by explicit reply - Message ${message.id}`);
+                    silenceBreakActive = false;
+                }
+            }
+            lastMessageTimestamp = message.timestamp;
+
+            // Link message to its parent (explicit or implied)
+            if (effectiveParentId) {
+                const parent = idToMessage.get(effectiveParentId);
+                if (parent) {
+                    parent.children?.push(message);
+                    // Ensure the message retains its parent ID even after being added to children
+                    message.parentId = effectiveParentId;
+                    console.log(`Threadweaver: Linked message ${message.id} to parent ${effectiveParentId}`);
+                } else {
+                    console.log(
+                        `Threadweaver: Parent ${effectiveParentId} not found for message ${message.id}, treating as root`,
+                    );
+                    rootMessages.push(message);
+                }
+            } else {
+                console.log(`Threadweaver: No parent for message ${message.id}, treating as root`);
+                rootMessages.push(message);
+            }
         }
-      } else {
-        console.log(`Threadweaver: No parent for message ${message.id}, treating as root`);
-        rootMessages.push(message);
-      }
+
+        return rootMessages;
     }
 
-    return rootMessages;
-  }
+    // Render the thread UI
+    private renderThread(): void {
+        if (!this.threadContainer) return;
 
-  // Render the thread UI
-  private renderThread(): void {
-    if (!this.threadContainer) return;
+        const threadweaverContainer = document.createElement("div");
+        threadweaverContainer.id = "threadweaver-container";
 
-    const threadweaverContainer = document.createElement('div');
-    threadweaverContainer.id = 'threadweaver-container';
+        // Parse messages and build tree
+        const rawMessages = this.parseMessages();
 
-    // Parse messages and build tree
-    const rawMessages = this.parseMessages();
-    
-    // Sort messages chronologically for numbering and color grading
-    const sortedMessages = [...rawMessages].sort((a, b) => a.timestamp - b.timestamp);
-    const messageNumbers = new Map<string, number>();
-    
-    // Assign chronological numbers to messages
-    sortedMessages.forEach((msg, index) => {
-      messageNumbers.set(msg.id, index + 1);
-    });
-    
-    // Sort for color grading (newest first)
-    const colorSortedMessages = [...rawMessages].sort((a, b) => b.timestamp - a.timestamp);
-    const messageColors = new Map<string, string>();
-    const messageBold = new Map<string, boolean>();
-    
-    // Set colors for the newest 15 messages
-    const baseGray = 128; // Medium gray
-    const numGradientMessages = Math.min(15, colorSortedMessages.length);
-    
-    colorSortedMessages.forEach((msg, index) => {
-      if (index === 0) {
-        // Newest message gets white and bold
-        messageColors.set(msg.id, 'rgb(255, 255, 255)');
-        messageBold.set(msg.id, true);
-      } else if (index < numGradientMessages) {
-        // Next 14 messages get gradient from just above medium gray to near-white
-        const colorValue = Math.floor(baseGray + ((255 - baseGray) * (numGradientMessages - index) / numGradientMessages));
-        messageColors.set(msg.id, `rgb(${colorValue}, ${colorValue}, ${colorValue})`);
-        messageBold.set(msg.id, false);
-      } else {
-        // Older messages get medium gray
-        messageColors.set(msg.id, `rgb(${baseGray}, ${baseGray}, ${baseGray})`);
-        messageBold.set(msg.id, false);
-      }
-    });
+        // Sort messages chronologically for numbering and color grading
+        const sortedMessages = [...rawMessages].sort((a, b) => a.timestamp - b.timestamp);
+        const messageNumbers = new Map<string, number>();
 
-    const rootMessages = this.buildMessageTree(rawMessages);
+        // Assign chronological numbers to messages
+        sortedMessages.forEach((msg, index) => {
+            messageNumbers.set(msg.id, index + 1);
+        });
 
-    // Clear existing container and append new content
-    threadweaverContainer.innerHTML = '';
+        // Sort for color grading (newest first)
+        const colorSortedMessages = [...rawMessages].sort((a, b) => b.timestamp - a.timestamp);
+        const messageColors = new Map<string, string>();
+        const messageBold = new Map<string, boolean>();
 
-    const renderMessages = (messages: MessageInfo[], depth = 0) => {
-      const container = document.createElement('div');
-      container.classList.add('message-thread');
-      
-      messages.forEach(message => {
-        const messageEl = this.createMessageElement(
-          message, 
-          depth, 
-          messageColors.get(message.id) || '', 
-          messageBold.get(message.id) || false,
-          messageNumbers.get(message.id) || 0,
-          messageNumbers.size
-        );
+        // Set colors for the newest 15 messages
+        const baseGray = 128; // Medium gray
+        const numGradientMessages = Math.min(15, colorSortedMessages.length);
 
-        const threadContainer = document.createElement('div');
-        threadContainer.classList.add('thread-container');
-        threadContainer.appendChild(messageEl);
+        colorSortedMessages.forEach((msg, index) => {
+            if (index === 0) {
+                // Newest message gets white and bold
+                messageColors.set(msg.id, "rgb(255, 255, 255)");
+                messageBold.set(msg.id, true);
+            } else if (index < numGradientMessages) {
+                // Next 14 messages get gradient from just above medium gray to near-white
+                const colorValue = Math.floor(
+                    baseGray + ((255 - baseGray) * (numGradientMessages - index)) / numGradientMessages,
+                );
+                messageColors.set(msg.id, `rgb(${colorValue}, ${colorValue}, ${colorValue})`);
+                messageBold.set(msg.id, false);
+            } else {
+                // Older messages get medium gray
+                messageColors.set(msg.id, `rgb(${baseGray}, ${baseGray}, ${baseGray})`);
+                messageBold.set(msg.id, false);
+            }
+        });
 
-        if (message.children && message.children.length > 0) {
-          const childrenContainer = renderMessages(message.children, depth + 1);
-          threadContainer.appendChild(childrenContainer);
+        const rootMessages = this.buildMessageTree(rawMessages);
+
+        // Clear existing container and append new content
+        threadweaverContainer.innerHTML = "";
+
+        const renderMessages = (messages: MessageInfo[], depth = 0) => {
+            const container = document.createElement("div");
+            container.classList.add("message-thread");
+
+            messages.forEach((message) => {
+                const messageEl = this.createMessageElement(
+                    message,
+                    depth,
+                    messageColors.get(message.id) || "",
+                    messageBold.get(message.id) || false,
+                    messageNumbers.get(message.id) || 0,
+                    messageNumbers.size,
+                );
+
+                const threadContainer = document.createElement("div");
+                threadContainer.classList.add("thread-container");
+                threadContainer.appendChild(messageEl);
+
+                if (message.children && message.children.length > 0) {
+                    const childrenContainer = renderMessages(message.children, depth + 1);
+                    threadContainer.appendChild(childrenContainer);
+                }
+
+                container.appendChild(threadContainer);
+            });
+
+            return container;
+        };
+
+        threadweaverContainer.appendChild(renderMessages(rootMessages));
+
+        // Hide original thread container and append custom UI
+        this.threadContainer.style.display = "none";
+        const parentElement = this.threadContainer.parentElement;
+        if (parentElement) {
+            parentElement.style.position = "relative";
+            parentElement.appendChild(threadweaverContainer);
         }
 
-        container.appendChild(threadContainer);
-      });
-
-      return container;
-    };
-
-    threadweaverContainer.appendChild(renderMessages(rootMessages));
-
-    // Hide original thread container and append custom UI
-    this.threadContainer.style.display = 'none';
-    const parentElement = this.threadContainer.parentElement;
-    if (parentElement) {
-      parentElement.style.position = 'relative';
-      parentElement.appendChild(threadweaverContainer);
+        // Try to hide header again after rendering
+        this.findAndHideHeader();
     }
 
-    // Try to hide header again after rendering
-    this.findAndHideHeader();
-  }
+    // Create a message element
+    private createMessageElement(
+        message: MessageInfo,
+        depth: number,
+        color: string,
+        isBold: boolean,
+        commentNumber: number,
+        totalMessages: number,
+    ): HTMLElement {
+        const el = document.createElement("div");
+        el.classList.add("threadweaver-message");
+        el.style.marginLeft = `${depth * 20}px`;
 
-  // Create a message element
-  private createMessageElement(
-    message: MessageInfo, 
-    depth: number, 
-    color: string, 
-    isBold: boolean,
-    commentNumber: number,
-    totalMessages: number
-  ): HTMLElement {
-    const el = document.createElement('div');
-    el.classList.add('threadweaver-message');
-    el.style.marginLeft = `${depth * 20}px`;
-    
-    // Preview container (always visible)
-    const previewContainer = document.createElement('div');
-    previewContainer.classList.add('preview-container');
-    
-    // Create number pill container
-    const pillContainer = document.createElement('div');
-    pillContainer.classList.add('pill-container');
-    
-    // Add navigation arrows
-    const prevArrow = document.createElement('button');
-    prevArrow.classList.add('nav-arrow', 'prev');
-    prevArrow.textContent = '←';
-    prevArrow.disabled = commentNumber === 1;
-    prevArrow.onclick = (e) => {
-      e.stopPropagation();
-      this.highlightMessage(commentNumber - 1);
-    };
-    
-    const nextArrow = document.createElement('button');
-    nextArrow.classList.add('nav-arrow', 'next');
-    nextArrow.textContent = '→';
-    nextArrow.disabled = commentNumber === totalMessages;
-    nextArrow.onclick = (e) => {
-      e.stopPropagation();
-      this.highlightMessage(commentNumber + 1);
-    };
+        // Preview container (always visible)
+        const previewContainer = document.createElement("div");
+        previewContainer.classList.add("preview-container");
 
-    const upArrow = document.createElement('button');
-    upArrow.classList.add('nav-arrow', 'up');
-    upArrow.textContent = '↑';
-    upArrow.disabled = !message.parentId;
-    upArrow.onclick = (e) => {
-      e.stopPropagation();
-      if (message.parentId) {
-        const parentEl = document.querySelector(`[data-msg-id="${message.parentId}"]`);
-        if (parentEl) {
-          parentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          this.highlightMessage(parseInt(parentEl.querySelector('.comment-number')?.textContent || '0'));
+        // Create number pill container
+        const pillContainer = document.createElement("div");
+        pillContainer.classList.add("pill-container");
+
+        // Add navigation arrows
+        const prevArrow = document.createElement("button");
+        prevArrow.classList.add("nav-arrow", "prev");
+        prevArrow.textContent = "←";
+        prevArrow.disabled = commentNumber === 1;
+        prevArrow.onclick = (e) => {
+            e.stopPropagation();
+            this.highlightMessage(commentNumber - 1);
+        };
+
+        const nextArrow = document.createElement("button");
+        nextArrow.classList.add("nav-arrow", "next");
+        nextArrow.textContent = "→";
+        nextArrow.disabled = commentNumber === totalMessages;
+        nextArrow.onclick = (e) => {
+            e.stopPropagation();
+            this.highlightMessage(commentNumber + 1);
+        };
+
+        const upArrow = document.createElement("button");
+        upArrow.classList.add("nav-arrow", "up");
+        upArrow.textContent = "↑";
+        upArrow.disabled = !message.parentId;
+        upArrow.onclick = (e) => {
+            e.stopPropagation();
+            if (message.parentId) {
+                const parentEl = document.querySelector(`[data-msg-id="${message.parentId}"]`);
+                if (parentEl) {
+                    parentEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                    this.highlightMessage(parseInt(parentEl.querySelector(".comment-number")?.textContent || "0"));
+                }
+            }
+        };
+
+        // Add comment number pill
+        const numberPill = document.createElement("span");
+        numberPill.classList.add("comment-number");
+        numberPill.textContent = commentNumber.toString();
+
+        pillContainer.appendChild(prevArrow);
+        pillContainer.appendChild(upArrow);
+        pillContainer.appendChild(numberPill);
+        pillContainer.appendChild(nextArrow);
+
+        const contentPreview = document.createElement("span");
+        contentPreview.classList.add("message-content", "preview");
+        contentPreview.textContent = message.content;
+        contentPreview.style.color = color;
+        if (isBold) {
+            contentPreview.style.fontWeight = "bold";
         }
-      }
-    };
-    
-    // Add comment number pill
-    const numberPill = document.createElement('span');
-    numberPill.classList.add('comment-number');
-    numberPill.textContent = commentNumber.toString();
-    
-    pillContainer.appendChild(prevArrow);
-    pillContainer.appendChild(upArrow);
-    pillContainer.appendChild(numberPill);
-    pillContainer.appendChild(nextArrow);
-    
-    const contentPreview = document.createElement('span');
-    contentPreview.classList.add('message-content', 'preview');
-    contentPreview.textContent = message.content;
-    contentPreview.style.color = color;
-    if (isBold) {
-      contentPreview.style.fontWeight = 'bold';
+
+        const separator = document.createElement("span");
+        separator.classList.add("separator");
+        separator.textContent = " : ";
+
+        const authorSpan = document.createElement("span");
+        authorSpan.classList.add("message-author");
+        authorSpan.textContent = message.author;
+
+        previewContainer.appendChild(pillContainer);
+        previewContainer.appendChild(contentPreview);
+        previewContainer.appendChild(separator);
+        previewContainer.appendChild(authorSpan);
+
+        // Full content container (shown when expanded)
+        const fullContentContainer = document.createElement("div");
+        fullContentContainer.classList.add("full-content");
+
+        // Add username header and reply button container
+        const headerContainer = document.createElement("div");
+        headerContainer.classList.add("expanded-header");
+
+        const expandedAuthor = document.createElement("span");
+        expandedAuthor.classList.add("expanded-author");
+        expandedAuthor.textContent = message.author;
+
+        const rightContainer = document.createElement("div");
+        rightContainer.classList.add("expanded-header-right");
+
+        const timestamp = document.createElement("span");
+        timestamp.classList.add("expanded-timestamp");
+        timestamp.textContent = new Date(message.timestamp).toLocaleString();
+
+        const replyButton = document.createElement("button");
+        replyButton.classList.add("reply-button");
+        replyButton.textContent = "Reply";
+        replyButton.onclick = (e) => {
+            e.stopPropagation(); // Prevent collapsing when clicking reply
+        };
+
+        headerContainer.appendChild(expandedAuthor);
+        rightContainer.appendChild(timestamp);
+        rightContainer.appendChild(replyButton);
+        headerContainer.appendChild(rightContainer);
+
+        const messageContent = document.createElement("div");
+        messageContent.classList.add("message-content-expanded");
+        console.log(`Threadweaver: Setting innerHTML for message ${message.id}:`, message.htmlContent);
+        messageContent.innerHTML = message.htmlContent;
+
+        // Debug the rendered content
+        const renderedImages = messageContent.querySelectorAll("img");
+        console.log(`Threadweaver: Rendered ${renderedImages.length} images in message ${message.id}`);
+        renderedImages.forEach((img, idx) => {
+            console.log(`Threadweaver: Rendered image ${idx + 1}/${renderedImages.length}:`, {
+                src: img.src,
+                "aria-label": img.getAttribute("aria-label"),
+                alt: img.alt,
+                width: img.width,
+                height: img.height,
+                display: window.getComputedStyle(img).display,
+            });
+        });
+
+        fullContentContainer.appendChild(headerContainer);
+        fullContentContainer.appendChild(messageContent);
+        fullContentContainer.style.display = "none";
+
+        el.appendChild(previewContainer);
+        el.appendChild(fullContentContainer);
+        el.dataset.msgId = message.id;
+
+        el.addEventListener("click", () => {
+            // Collapse any other expanded messages first
+            document.querySelectorAll(".threadweaver-message.expanded").forEach((expandedEl) => {
+                if (expandedEl !== el) {
+                    expandedEl.classList.remove("expanded");
+                    const prevContainer = expandedEl.querySelector(".preview-container") as HTMLElement;
+                    const prevFullContent = expandedEl.querySelector(".full-content") as HTMLElement;
+                    if (prevContainer) prevContainer.style.display = "flex";
+                    if (prevFullContent) prevFullContent.style.display = "none";
+                }
+            });
+
+            // Toggle this message
+            const isExpanded = el.classList.toggle("expanded");
+            previewContainer.style.display = isExpanded ? "none" : "flex";
+            fullContentContainer.style.display = isExpanded ? "block" : "none";
+        });
+
+        return el;
     }
-    
-    const separator = document.createElement('span');
-    separator.classList.add('separator');
-    separator.textContent = ' : ';
-    
-    const authorSpan = document.createElement('span');
-    authorSpan.classList.add('message-author');
-    authorSpan.textContent = message.author;
-    
-    previewContainer.appendChild(pillContainer);
-    previewContainer.appendChild(contentPreview);
-    previewContainer.appendChild(separator);
-    previewContainer.appendChild(authorSpan);
-    
-    // Full content container (shown when expanded)
-    const fullContentContainer = document.createElement('div');
-    fullContentContainer.classList.add('full-content');
 
-    // Add username header and reply button container
-    const headerContainer = document.createElement('div');
-    headerContainer.classList.add('expanded-header');
-    
-    const expandedAuthor = document.createElement('span');
-    expandedAuthor.classList.add('expanded-author');
-    expandedAuthor.textContent = message.author;
-    
-    const rightContainer = document.createElement('div');
-    rightContainer.classList.add('expanded-header-right');
-    
-    const timestamp = document.createElement('span');
-    timestamp.classList.add('expanded-timestamp');
-    timestamp.textContent = new Date(message.timestamp).toLocaleString();
-    
-    const replyButton = document.createElement('button');
-    replyButton.classList.add('reply-button');
-    replyButton.textContent = 'Reply';
-    replyButton.onclick = (e) => {
-      e.stopPropagation(); // Prevent collapsing when clicking reply
-    };
-    
-    headerContainer.appendChild(expandedAuthor);
-    rightContainer.appendChild(timestamp);
-    rightContainer.appendChild(replyButton);
-    headerContainer.appendChild(rightContainer);
+    private highlightMessage(number: number): void {
+        // Remove any existing highlights and clear any pending fade timeouts
+        document.querySelectorAll(".threadweaver-message.highlighted").forEach((el) => {
+            el.classList.remove("highlighted");
+            el.classList.remove("fade-out");
+            const timeoutId = el.getAttribute("data-fade-timeout");
+            if (timeoutId) {
+                clearTimeout(parseInt(timeoutId));
+            }
+        });
 
-    const messageContent = document.createElement('div');
-    messageContent.classList.add('message-content-expanded');
-    console.log(`Threadweaver: Setting innerHTML for message ${message.id}:`, message.htmlContent);
-    messageContent.innerHTML = message.htmlContent;
+        // Find and highlight the target message
+        const messages = document.querySelectorAll(".threadweaver-message");
+        messages.forEach((msg) => {
+            const pillNumber = msg.querySelector(".comment-number")?.textContent;
+            if (pillNumber === number.toString()) {
+                msg.classList.add("highlighted");
+                msg.scrollIntoView({ behavior: "smooth", block: "center" });
 
-    // Debug the rendered content
-    const renderedImages = messageContent.querySelectorAll('img');
-    console.log(`Threadweaver: Rendered ${renderedImages.length} images in message ${message.id}`);
-    renderedImages.forEach((img, idx) => {
-      console.log(`Threadweaver: Rendered image ${idx + 1}/${renderedImages.length}:`, {
-        src: img.src,
-        'aria-label': img.getAttribute('aria-label'),
-        alt: img.alt,
-        width: img.width,
-        height: img.height,
-        display: window.getComputedStyle(img).display
-      });
-    });
+                // Set up the fade out
+                const timeoutId = setTimeout(() => {
+                    msg.classList.add("fade-out");
+                    // Remove classes after fade animation completes
+                    setTimeout(() => {
+                        msg.classList.remove("highlighted");
+                        msg.classList.remove("fade-out");
+                    }, 300); // Match the CSS transition duration
+                }, 3000);
 
-    fullContentContainer.appendChild(headerContainer);
-    fullContentContainer.appendChild(messageContent);
-    fullContentContainer.style.display = 'none';
-    
-    el.appendChild(previewContainer);
-    el.appendChild(fullContentContainer);
-    el.dataset.msgId = message.id;
+                msg.setAttribute("data-fade-timeout", timeoutId.toString());
+            }
+        });
+    }
 
-    el.addEventListener('click', () => {
-      // Collapse any other expanded messages first
-      document.querySelectorAll('.threadweaver-message.expanded').forEach(expandedEl => {
-        if (expandedEl !== el) {
-          expandedEl.classList.remove('expanded');
-          const prevContainer = expandedEl.querySelector('.preview-container') as HTMLElement;
-          const prevFullContent = expandedEl.querySelector('.full-content') as HTMLElement;
-          if (prevContainer) prevContainer.style.display = 'flex';
-          if (prevFullContent) prevFullContent.style.display = 'none';
-        }
-      });
+    // Attach a MutationObserver to monitor DOM changes
+    private setupMutationObserver(): void {
+        this.observer = new MutationObserver((mutations) => {
+            // Check if any mutation added new messages
+            const hasNewMessages = mutations.some((mutation) =>
+                Array.from(mutation.addedNodes).some(
+                    (node) =>
+                        node instanceof HTMLElement &&
+                        (node.matches('li[id^="chat-messages-"]') || node.querySelector('li[id^="chat-messages-"]')),
+                ),
+            );
 
-      // Toggle this message
-      const isExpanded = el.classList.toggle('expanded');
-      previewContainer.style.display = isExpanded ? 'none' : 'flex';
-      fullContentContainer.style.display = isExpanded ? 'block' : 'none';
-    });
+            if (hasNewMessages) {
+                console.log("Threadweaver: Detected new messages.");
+                const newThreadContainer = this.findThreadContainer();
+                if (newThreadContainer && newThreadContainer !== this.threadContainer) {
+                    console.log("Threadweaver: Updating thread container with new messages.");
+                    this.threadContainer = newThreadContainer;
+                    this.renderThread();
+                }
+            }
+        });
 
-    return el;
-  }
+        this.observer.observe(this.appContainer!, {
+            childList: true,
+            subtree: true,
+        });
 
-  private highlightMessage(number: number): void {
-    // Remove any existing highlights and clear any pending fade timeouts
-    document.querySelectorAll('.threadweaver-message.highlighted').forEach(el => {
-      el.classList.remove('highlighted');
-      el.classList.remove('fade-out');
-      const timeoutId = el.getAttribute('data-fade-timeout');
-      if (timeoutId) {
-        clearTimeout(parseInt(timeoutId));
-      }
-    });
+        console.log("Threadweaver: MutationObserver attached.");
+    }
 
-    // Find and highlight the target message
-    const messages = document.querySelectorAll('.threadweaver-message');
-    messages.forEach(msg => {
-      const pillNumber = msg.querySelector('.comment-number')?.textContent;
-      if (pillNumber === number.toString()) {
-        msg.classList.add('highlighted');
-        msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Set up the fade out
-        const timeoutId = setTimeout(() => {
-          msg.classList.add('fade-out');
-          // Remove classes after fade animation completes
-          setTimeout(() => {
-            msg.classList.remove('highlighted');
-            msg.classList.remove('fade-out');
-          }, 300); // Match the CSS transition duration
-        }, 3000);
-        
-        msg.setAttribute('data-fade-timeout', timeoutId.toString());
-      }
-    });
-  }
+    // Fallback: Polling to handle delayed loading or missed events
+    private setupPolling(): void {
+        let attempts = 0;
+        const maxAttempts = 30; // Try for 30 seconds
+        const interval = setInterval(() => {
+            attempts++;
+            const newThreadContainer = this.findThreadContainer();
 
-  // Attach a MutationObserver to monitor DOM changes
-  private setupMutationObserver(): void {
-    this.observer = new MutationObserver((mutations) => {
-      // Check if any mutation added new messages
-      const hasNewMessages = mutations.some(mutation => 
-        Array.from(mutation.addedNodes).some(node => 
-          node instanceof HTMLElement && 
-          (node.matches('li[id^="chat-messages-"]') || node.querySelector('li[id^="chat-messages-"]'))
-        )
-      );
+            if (newThreadContainer && newThreadContainer !== this.threadContainer) {
+                console.log("Threadweaver: Thread container with messages found via polling.");
+                this.threadContainer = newThreadContainer;
+                this.renderThread();
+            }
 
-      if (hasNewMessages) {
-        console.log('Threadweaver: Detected new messages.');
-      const newThreadContainer = this.findThreadContainer();
-      if (newThreadContainer && newThreadContainer !== this.threadContainer) {
-          console.log('Threadweaver: Updating thread container with new messages.');
-        this.threadContainer = newThreadContainer;
-        this.renderThread();
-        }
-      }
-    });
+            // Only stop polling if we've found messages or exceeded max attempts
+            if ((newThreadContainer && newThreadContainer.children.length > 0) || attempts >= maxAttempts) {
+                console.log(
+                    "Threadweaver: Stopping polling - " +
+                        (attempts >= maxAttempts ? "max attempts reached" : "messages found"),
+                );
+                clearInterval(interval);
+            }
+        }, 1000);
+    }
 
-    this.observer.observe(this.appContainer!, {
-      childList: true,
-      subtree: true,
-    });
-
-    console.log('Threadweaver: MutationObserver attached.');
-  }
-
-  // Fallback: Polling to handle delayed loading or missed events
-  private setupPolling(): void {
-    let attempts = 0;
-    const maxAttempts = 30; // Try for 30 seconds
-    const interval = setInterval(() => {
-      attempts++;
-      const newThreadContainer = this.findThreadContainer();
-      
-      if (newThreadContainer && newThreadContainer !== this.threadContainer) {
-        console.log('Threadweaver: Thread container with messages found via polling.');
-        this.threadContainer = newThreadContainer;
-        this.renderThread();
-      }
-
-      // Only stop polling if we've found messages or exceeded max attempts
-      if ((newThreadContainer && newThreadContainer.children.length > 0) || attempts >= maxAttempts) {
-        console.log('Threadweaver: Stopping polling - ' + 
-          (attempts >= maxAttempts ? 'max attempts reached' : 'messages found'));
-        clearInterval(interval);
-      }
-    }, 1000);
-  }
-
-  // Inject CSS styles for the thread UI
-  private injectStyles(): void {
-    const styles = `
+    // Inject CSS styles for the thread UI
+    private injectStyles(): void {
+        const styles = `
       #threadweaver-container {
         padding: 16px;
         padding-bottom: 100px;
@@ -887,39 +908,39 @@ class Threadweaver {
       /* Rest of the styles... */
     `;
 
-    const styleElement = document.createElement('style');
-    styleElement.textContent = styles;
-    document.head.appendChild(styleElement);
-  }
-
-  private setupHeaderObserver(): void {
-    // Initial attempt to hide header
-    this.findAndHideHeader();
-
-    // Keep watching for header changes
-    this.headerObserver = new MutationObserver(() => {
-      this.findAndHideHeader();
-    });
-
-    this.headerObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  private findAndHideHeader(): void {
-    const headers = document.querySelectorAll('div[class*=" "]');
-    for (const header of Array.from(headers)) {
-      const classes = Array.from(header.classList);
-      const hasContainerClass = classes.some(cls => cls.startsWith('container_'));
-      const hasHeaderClass = classes.some(cls => cls.startsWith('header_'));
-      if (hasContainerClass && hasHeaderClass && header instanceof HTMLElement) {
-        header.style.display = 'none';
-        console.log('Threadweaver: Found and hid channel header');
-        break;
-      }
+        const styleElement = document.createElement("style");
+        styleElement.textContent = styles;
+        document.head.appendChild(styleElement);
     }
-  }
+
+    private setupHeaderObserver(): void {
+        // Initial attempt to hide header
+        this.findAndHideHeader();
+
+        // Keep watching for header changes
+        this.headerObserver = new MutationObserver(() => {
+            this.findAndHideHeader();
+        });
+
+        this.headerObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+    }
+
+    private findAndHideHeader(): void {
+        const headers = document.querySelectorAll('div[class*=" "]');
+        for (const header of Array.from(headers)) {
+            const classes = Array.from(header.classList);
+            const hasContainerClass = classes.some((cls) => cls.startsWith("container_"));
+            const hasHeaderClass = classes.some((cls) => cls.startsWith("header_"));
+            if (hasContainerClass && hasHeaderClass && header instanceof HTMLElement) {
+                header.style.display = "none";
+                console.log("Threadweaver: Found and hid channel header");
+                break;
+            }
+        }
+    }
 }
 
 // Initialize the Threadweaver class

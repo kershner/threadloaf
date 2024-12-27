@@ -578,6 +578,18 @@ class Threadweaver {
     el.dataset.msgId = message.id;
 
     el.addEventListener('click', () => {
+      // Collapse any other expanded messages first
+      document.querySelectorAll('.threadweaver-message.expanded').forEach(expandedEl => {
+        if (expandedEl !== el) {
+          expandedEl.classList.remove('expanded');
+          const prevContainer = expandedEl.querySelector('.preview-container') as HTMLElement;
+          const prevFullContent = expandedEl.querySelector('.full-content') as HTMLElement;
+          if (prevContainer) prevContainer.style.display = 'flex';
+          if (prevFullContent) prevFullContent.style.display = 'none';
+        }
+      });
+
+      // Toggle this message
       const isExpanded = el.classList.toggle('expanded');
       previewContainer.style.display = isExpanded ? 'none' : 'flex';
       fullContentContainer.style.display = isExpanded ? 'block' : 'none';

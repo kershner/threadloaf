@@ -1,0 +1,15 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# Source code
+*.ts text
+*.js text
+*.json text
+*.html text
+*.css text
+*.md text
+
+# Documentation
+*.txt text
+*.md text
+LICENSE text 

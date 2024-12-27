@@ -1,0 +1,14 @@
+{
+    "manifest_version": 3,
+    "name": "Threadweaver",
+    "version": "0.1",
+    "description": "Reconstruct Discord forum threads into hierarchical trees.",
+    "permissions": [],
+    "content_scripts": [
+      {
+        "matches": ["*://discord.com/*"],
+        "js": ["dist/content_script.js"]
+      }
+    ]
+  }
+  

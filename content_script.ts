@@ -78,6 +78,7 @@ class Threadweaver {
 
     const messages = Array.from(this.threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map((el) => {
       const id = el.id.split('-').pop() || '';
+      console.log(`Threadweaver: Processing message ${id}`);
 
       const contentsEl = el.querySelector('[class^="contents_"]');
       if (!contentsEl) {
@@ -117,11 +118,111 @@ class Threadweaver {
         throw new Error('Failed to find message content element. Aborting message parsing.');
       }
 
-      // Clone the content element to preserve the full HTML
-      const contentClone = messageContentEl.cloneNode(true) as HTMLElement;
+      // Find accessories/embeds container
+      const accessoriesId = `message-accessories-${id}`;
+      const accessoriesEl = el.querySelector(`#${accessoriesId}`);
+      console.log(`Threadweaver: Looking for accessories with ID ${accessoriesId}`, accessoriesEl);
+
+      // Debug image detection in both content and accessories
+      const contentImages = messageContentEl.querySelectorAll('img');
+      const accessoryImages = accessoriesEl ? accessoriesEl.querySelectorAll('img') : [];
+      const totalImages = contentImages.length + accessoryImages.length;
       
-      // Get text content for preview
-      const textContent = messageContentEl.textContent || '';
+      console.log(`Threadweaver: Found ${totalImages} total images in message ${id}:`, {
+        contentImages: contentImages.length,
+        accessoryImages: accessoryImages.length
+      });
+
+      // Log details for all images
+      [...contentImages, ...accessoryImages].forEach((img, idx) => {
+        console.log(`Threadweaver: Image ${idx + 1}/${totalImages}:`, {
+          src: img.src,
+          'aria-label': img.getAttribute('aria-label'),
+          class: img.className,
+          width: img.width,
+          height: img.height,
+          container: img.closest('#' + accessoriesId) ? 'accessories' : 'content'
+        });
+      });
+
+      // Get text content for preview, handling image-only messages
+      let textContent = messageContentEl.textContent || '';
+      if (!textContent) {
+        if (totalImages > 0) {
+          textContent = '🖼️ Image';
+        } else if (accessoriesEl) {
+          const links = accessoriesEl.querySelectorAll('a[href]');
+          if (links.length > 0) {
+            textContent = '🔗 Link';
+          }
+        }
+        console.log(`Threadweaver: Message ${id} is media-only`);
+      }
+
+      // Clone both content and accessories
+      const contentClone = messageContentEl.cloneNode(true) as HTMLElement;
+      let fullContent = contentClone;
+
+      if (accessoriesEl) {
+        // Convert embeds to plain text links
+        const links = Array.from(accessoriesEl.querySelectorAll<HTMLAnchorElement>('a[href]')).map(a => a.href);
+        const images = Array.from(accessoriesEl.querySelectorAll<HTMLImageElement>('img[src]')).map(img => img.src);
+        
+        // Create a container for content and links
+        const container = document.createElement('div');
+        container.appendChild(contentClone);
+
+        // Add all unique links
+        const uniqueLinks = [...new Set([...links, ...images])];
+        if (uniqueLinks.length > 0) {
+          const linkList = document.createElement('div');
+          linkList.classList.add('embed-links');
+          
+          uniqueLinks.forEach(url => {
+            const link = document.createElement('a');
+            link.href = url;
+            // Truncate long URLs
+            if (url.length > 70) {
+              const start = url.slice(0, 35);
+              const end = url.slice(-30);
+              link.textContent = `${start}...${end}`;
+              link.title = url; // Show full URL on hover
+            } else {
+              link.textContent = url;
+            }
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            
+            const linkContainer = document.createElement('div');
+            linkContainer.appendChild(link);
+            linkList.appendChild(linkContainer);
+          });
+          
+          container.appendChild(linkList);
+        }
+        
+        fullContent = container;
+        console.log(`Threadweaver: Converted embeds to ${uniqueLinks.length} links for message ${id}`);
+      }
+
+      // Fix all image sources in the cloned content
+      fullContent.querySelectorAll('img').forEach((img, idx) => {
+        const originalSrc = img.src;
+        if (img.src) {
+          img.src = img.src; // Force a re-assignment to resolve any relative URLs
+          console.log(`Threadweaver: Processed image ${idx + 1} src:`, {
+            original: originalSrc,
+            new: img.src
+          });
+        }
+        if (img.getAttribute('aria-label')) {
+          img.alt = img.getAttribute('aria-label') || '';
+          console.log(`Threadweaver: Copied aria-label to alt:`, img.alt);
+        }
+      });
+
+      // Debug the final HTML content
+      console.log(`Threadweaver: Final HTML for message ${id}:`, fullContent.innerHTML);
 
       let parentId: string | undefined = undefined;
       const replyContextMaybe = el.querySelector('[id^="message-reply-context-"]');
@@ -134,7 +235,7 @@ class Threadweaver {
         author, 
         timestamp, 
         content: textContent,
-        htmlContent: contentClone.innerHTML,
+        htmlContent: fullContent.innerHTML,
         parentId, 
         children: [] 
       };
@@ -374,8 +475,23 @@ class Threadweaver {
     
     const messageContent = document.createElement('div');
     messageContent.classList.add('message-content-expanded');
+    console.log(`Threadweaver: Setting innerHTML for message ${message.id}:`, message.htmlContent);
     messageContent.innerHTML = message.htmlContent;
-    
+
+    // Debug the rendered content
+    const renderedImages = messageContent.querySelectorAll('img');
+    console.log(`Threadweaver: Rendered ${renderedImages.length} images in message ${message.id}`);
+    renderedImages.forEach((img, idx) => {
+      console.log(`Threadweaver: Rendered image ${idx + 1}/${renderedImages.length}:`, {
+        src: img.src,
+        'aria-label': img.getAttribute('aria-label'),
+        alt: img.alt,
+        width: img.width,
+        height: img.height,
+        display: window.getComputedStyle(img).display
+      });
+    });
+
     fullContentContainer.appendChild(headerContainer);
     fullContentContainer.appendChild(messageContent);
     fullContentContainer.style.display = 'none';
@@ -588,6 +704,13 @@ class Threadweaver {
       .message-content-expanded img {
         max-width: 100%;
         height: auto;
+        border-radius: 8px;
+        margin: 4px 0;
+        display: block;
+      }
+
+      .message-content.preview img {
+        display: none;
       }
 
       .threadweaver-message:hover {
@@ -688,6 +811,69 @@ class Threadweaver {
       .threadweaver-message.fade-out {
         background: rgba(255, 255, 255, 0.05);
         transition: background 0.3s ease;
+      }
+
+      /* Embed/accessories styles */
+      [class*="container_b558d0"] {
+        margin-top: 8px;
+      }
+
+      [class*="visualMediaItemContainer_"] {
+        max-width: 100%;
+        margin: 4px 0;
+      }
+
+      [class*="imageContent_"] img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        display: block;
+      }
+
+      [class*="imageWrapper_"] {
+        max-width: 100% !important;
+        width: auto !important;
+      }
+
+      [class*="clickableWrapper_"] {
+        max-width: 100%;
+      }
+
+      [class*="loadingOverlay_"] {
+        max-width: 100%;
+      }
+
+      [class*="loadingOverlay_"] img {
+        max-width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+      }
+
+      /* Hide edit buttons and other UI elements we don't need */
+      [class*="hoverButtonGroup_"] {
+        display: none;
+      }
+
+      .embed-links {
+        margin-top: 8px;
+      }
+
+      .embed-links div {
+        margin: 4px 0;
+      }
+
+      .embed-links a {
+        color: #5865F2;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        font-size: 0.9em;
+      }
+
+      .embed-links a:hover {
+        text-decoration: underline;
       }
     `;
 

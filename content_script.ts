@@ -262,26 +262,60 @@ class Threadweaver {
     let lastReplyParentId: string | undefined = undefined;
     let lastReplyTimestamp: number = 0;
     const ONE_MINUTE = 60 * 1000; // milliseconds
+    const SILENCE_BREAK_THRESHOLD = 10 * 60 * 1000; // milliseconds
+
+    // Track silence break heuristic
+    let lastMessageTimestamp: number = 0;
+    let silenceBreakMessageId: string | undefined = undefined;
+    let silenceBreakTimestamp: number = 0;
+    let silenceBreakActive = false;
 
     // Build the tree by linking children to parents
     for (const message of sortedMessages) {
       let effectiveParentId = message.parentId;
 
-      // If this message has no explicit parent, check for implied relationship
-      if (!effectiveParentId && lastReplyParentId) {
-        const timeSinceLastReply = message.timestamp - lastReplyTimestamp;
-        if (timeSinceLastReply <= ONE_MINUTE) {
-          // Within one minute of last reply, use the same parent
-          effectiveParentId = lastReplyParentId;
-          console.log(`Threadweaver: Implied parent relationship - Message ${message.id} -> Parent ${lastReplyParentId}`);
+      // Check for silence break
+      const timeSinceLastMessage = message.timestamp - lastMessageTimestamp;
+      if (timeSinceLastMessage >= SILENCE_BREAK_THRESHOLD) {
+        // This message breaks a long silence
+        silenceBreakMessageId = message.id;
+        silenceBreakTimestamp = message.timestamp;
+        silenceBreakActive = true;
+        console.log(`Threadweaver: Silence break detected - Message ${message.id} breaks ${timeSinceLastMessage/1000}s silence`);
+      }
+
+      // If this message has no explicit parent, check for implied relationships
+      if (!effectiveParentId) {
+        if (lastReplyParentId) {
+          // Check recent reply heuristic
+          const timeSinceLastReply = message.timestamp - lastReplyTimestamp;
+          if (timeSinceLastReply <= ONE_MINUTE) {
+            // Within one minute of last reply, use the same parent
+            effectiveParentId = lastReplyParentId;
+            console.log(`Threadweaver: Implied parent (recent reply) - Message ${message.id} -> Parent ${lastReplyParentId}`);
+          }
+        } else if (silenceBreakActive) {
+          // Check silence break heuristic
+          const timeSinceSilenceBreak = message.timestamp - silenceBreakTimestamp;
+          if (timeSinceSilenceBreak <= ONE_MINUTE) {
+            effectiveParentId = silenceBreakMessageId;
+            console.log(`Threadweaver: Implied parent (silence break) - Message ${message.id} -> Parent ${silenceBreakMessageId}`);
+          }
         }
       }
 
-      // Update tracking of last reply
+      // Update tracking
       if (message.parentId) {
+        // If this is an explicit reply, update reply tracking
         lastReplyParentId = message.parentId;
         lastReplyTimestamp = message.timestamp;
+        // If within the silence break window, this explicit reply ends the silence break heuristic
+        if (silenceBreakActive && message.timestamp - silenceBreakTimestamp <= ONE_MINUTE) {
+          console.log(`Threadweaver: Silence break ended by explicit reply - Message ${message.id}`);
+          silenceBreakActive = false;
+        }
       }
+      lastMessageTimestamp = message.timestamp;
 
       // Link message to its parent (explicit or implied)
       if (effectiveParentId) {
@@ -463,6 +497,13 @@ class Threadweaver {
     expandedAuthor.classList.add('expanded-author');
     expandedAuthor.textContent = message.author;
     
+    const rightContainer = document.createElement('div');
+    rightContainer.classList.add('expanded-header-right');
+    
+    const timestamp = document.createElement('span');
+    timestamp.classList.add('expanded-timestamp');
+    timestamp.textContent = new Date(message.timestamp).toLocaleString();
+    
     const replyButton = document.createElement('button');
     replyButton.classList.add('reply-button');
     replyButton.textContent = 'Reply';
@@ -471,8 +512,10 @@ class Threadweaver {
     };
     
     headerContainer.appendChild(expandedAuthor);
-    headerContainer.appendChild(replyButton);
-    
+    rightContainer.appendChild(timestamp);
+    rightContainer.appendChild(replyButton);
+    headerContainer.appendChild(rightContainer);
+
     const messageContent = document.createElement('div');
     messageContent.classList.add('message-content-expanded');
     console.log(`Threadweaver: Setting innerHTML for message ${message.id}:`, message.htmlContent);
@@ -678,6 +721,17 @@ class Threadweaver {
         color: #f3e7b5;
         font-weight: bold;
         font-size: 1.1em;
+      }
+
+      .expanded-header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .expanded-timestamp {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.9em;
       }
 
       .reply-button {

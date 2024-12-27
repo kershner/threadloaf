@@ -128,9 +128,13 @@ class Threadweaver {
             const accessoriesEl = el.querySelector(`#${accessoriesId}`);
             console.log(`Threadweaver: Looking for accessories with ID ${accessoriesId}`, accessoriesEl);
 
+            // Find reactions container
+            const reactionsEl = el.querySelector('[class*="reactions_"]');
+            console.log(`Threadweaver: Found reactions container:`, reactionsEl);
+
             // Debug image detection in both content and accessories
             const contentImages = messageContentEl.querySelectorAll("img");
-            const accessoryImages = accessoriesEl ? accessoriesEl.querySelectorAll("img") : [];
+            const accessoryImages = accessoriesEl ? accessoriesEl.querySelectorAll("img:not([class*='emoji_'])") : [];
             const totalImages = contentImages.length + accessoryImages.length;
 
             console.log(`Threadweaver: Found ${totalImages} total images in message ${id}:`, {
@@ -139,15 +143,17 @@ class Threadweaver {
             });
 
             // Log details for all images
-            [...contentImages, ...accessoryImages].forEach((img, idx) => {
-                console.log(`Threadweaver: Image ${idx + 1}/${totalImages}:`, {
-                    src: img.src,
-                    "aria-label": img.getAttribute("aria-label"),
-                    class: img.className,
-                    width: img.width,
-                    height: img.height,
-                    container: img.closest("#" + accessoriesId) ? "accessories" : "content",
-                });
+            [...contentImages, ...accessoryImages].forEach((img) => {
+                if (img instanceof HTMLImageElement) {
+                    console.log(`Threadweaver: Image details:`, {
+                        src: img.src,
+                        "aria-label": img.getAttribute("aria-label"),
+                        class: img.className,
+                        width: img.width,
+                        height: img.height,
+                        container: img.closest("#" + accessoriesId) ? "accessories" : "content",
+                    });
+                }
             });
 
             // Get text content for preview, handling image-only messages
@@ -182,17 +188,23 @@ class Threadweaver {
             let fullContent = contentClone;
 
             if (accessoriesEl) {
-                // Convert embeds to plain text links
-                const links = Array.from(accessoriesEl.querySelectorAll<HTMLAnchorElement>("a[href]")).map(
-                    (a) => a.href,
-                );
-                const images = Array.from(accessoriesEl.querySelectorAll<HTMLImageElement>("img[src]")).map(
-                    (img) => img.src,
-                );
+                // Convert embeds to plain text links (excluding reactions)
+                const links = Array.from(
+                    accessoriesEl.querySelectorAll<HTMLAnchorElement>('a[href]:not([class*="reaction"])'),
+                ).map((a) => a.href);
+                const images = Array.from(
+                    accessoriesEl.querySelectorAll<HTMLImageElement>('img[src]:not([data-type="emoji"])'),
+                ).map((img) => img.src);
 
-                // Create a container for content and links
+                // Create a container for content, links, and reactions
                 const container = document.createElement("div");
                 container.appendChild(contentClone);
+
+                // Add reactions if present
+                if (reactionsEl) {
+                    const reactionsClone = reactionsEl.cloneNode(true) as HTMLElement;
+                    container.appendChild(reactionsClone);
+                }
 
                 // Add all unique links
                 const uniqueLinks = [...new Set([...links, ...images])];

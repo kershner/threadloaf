@@ -208,16 +208,25 @@ class Threadweaver {
     // Parse messages and build tree
     const rawMessages = this.parseMessages();
     
-    // Sort messages by timestamp for color grading
-    const sortedMessages = [...rawMessages].sort((a, b) => b.timestamp - a.timestamp);
+    // Sort messages chronologically for numbering and color grading
+    const sortedMessages = [...rawMessages].sort((a, b) => a.timestamp - b.timestamp);
+    const messageNumbers = new Map<string, number>();
+    
+    // Assign chronological numbers to messages
+    sortedMessages.forEach((msg, index) => {
+      messageNumbers.set(msg.id, index + 1);
+    });
+    
+    // Sort for color grading (newest first)
+    const colorSortedMessages = [...rawMessages].sort((a, b) => b.timestamp - a.timestamp);
     const messageColors = new Map<string, string>();
     const messageBold = new Map<string, boolean>();
     
     // Set colors for the newest 15 messages
     const baseGray = 128; // Medium gray
-    const numGradientMessages = Math.min(15, sortedMessages.length);
+    const numGradientMessages = Math.min(15, colorSortedMessages.length);
     
-    sortedMessages.forEach((msg, index) => {
+    colorSortedMessages.forEach((msg, index) => {
       if (index === 0) {
         // Newest message gets white and bold
         messageColors.set(msg.id, 'rgb(255, 255, 255)');
@@ -241,7 +250,14 @@ class Threadweaver {
 
     const renderMessages = (messages: MessageInfo[], depth = 0) => {
       for (const message of messages) {
-        const el = this.createMessageElement(message, depth, messageColors.get(message.id) || '', messageBold.get(message.id) || false);
+        const el = this.createMessageElement(
+          message, 
+          depth, 
+          messageColors.get(message.id) || '', 
+          messageBold.get(message.id) || false,
+          messageNumbers.get(message.id) || 0,
+          messageNumbers.size
+        );
         threadweaverContainer.appendChild(el);
 
         if (message.children) {
@@ -265,7 +281,14 @@ class Threadweaver {
   }
 
   // Create a message element
-  private createMessageElement(message: MessageInfo, depth: number, color: string, isBold: boolean): HTMLElement {
+  private createMessageElement(
+    message: MessageInfo, 
+    depth: number, 
+    color: string, 
+    isBold: boolean,
+    commentNumber: number,
+    totalMessages: number
+  ): HTMLElement {
     const el = document.createElement('div');
     el.classList.add('threadweaver-message');
     el.style.marginLeft = `${depth * 20}px`;
@@ -273,6 +296,38 @@ class Threadweaver {
     // Preview container (always visible)
     const previewContainer = document.createElement('div');
     previewContainer.classList.add('preview-container');
+    
+    // Create number pill container
+    const pillContainer = document.createElement('div');
+    pillContainer.classList.add('pill-container');
+    
+    // Add navigation arrows
+    const prevArrow = document.createElement('button');
+    prevArrow.classList.add('nav-arrow', 'prev');
+    prevArrow.textContent = '←';
+    prevArrow.disabled = commentNumber === 1;
+    prevArrow.onclick = (e) => {
+      e.stopPropagation();
+      this.highlightMessage(commentNumber - 1);
+    };
+    
+    const nextArrow = document.createElement('button');
+    nextArrow.classList.add('nav-arrow', 'next');
+    nextArrow.textContent = '→';
+    nextArrow.disabled = commentNumber === totalMessages;
+    nextArrow.onclick = (e) => {
+      e.stopPropagation();
+      this.highlightMessage(commentNumber + 1);
+    };
+    
+    // Add comment number pill
+    const numberPill = document.createElement('span');
+    numberPill.classList.add('comment-number');
+    numberPill.textContent = commentNumber.toString();
+    
+    pillContainer.appendChild(prevArrow);
+    pillContainer.appendChild(numberPill);
+    pillContainer.appendChild(nextArrow);
     
     const contentPreview = document.createElement('span');
     contentPreview.classList.add('message-content', 'preview');
@@ -290,6 +345,7 @@ class Threadweaver {
     authorSpan.classList.add('message-author');
     authorSpan.textContent = message.author;
     
+    previewContainer.appendChild(pillContainer);
     previewContainer.appendChild(contentPreview);
     previewContainer.appendChild(separator);
     previewContainer.appendChild(authorSpan);
@@ -335,6 +391,40 @@ class Threadweaver {
     });
 
     return el;
+  }
+
+  private highlightMessage(number: number): void {
+    // Remove any existing highlights and clear any pending fade timeouts
+    document.querySelectorAll('.threadweaver-message.highlighted').forEach(el => {
+      el.classList.remove('highlighted');
+      el.classList.remove('fade-out');
+      const timeoutId = el.getAttribute('data-fade-timeout');
+      if (timeoutId) {
+        clearTimeout(parseInt(timeoutId));
+      }
+    });
+
+    // Find and highlight the target message
+    const messages = document.querySelectorAll('.threadweaver-message');
+    messages.forEach(msg => {
+      const pillNumber = msg.querySelector('.comment-number')?.textContent;
+      if (pillNumber === number.toString()) {
+        msg.classList.add('highlighted');
+        msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Set up the fade out
+        const timeoutId = setTimeout(() => {
+          msg.classList.add('fade-out');
+          // Remove classes after fade animation completes
+          setTimeout(() => {
+            msg.classList.remove('highlighted');
+            msg.classList.remove('fade-out');
+          }, 300); // Match the CSS transition duration
+        }, 3000);
+        
+        msg.setAttribute('data-fade-timeout', timeoutId.toString());
+      }
+    });
   }
 
   // Attach a MutationObserver to monitor DOM changes
@@ -446,7 +536,7 @@ class Threadweaver {
         padding: 10px 12px;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 8px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -512,6 +602,92 @@ class Threadweaver {
       .message-author {
         color: #f3e7b5;
         flex-shrink: 0;
+      }
+
+      .comment-number {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 0.8em;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: 24px;
+        text-align: center;
+        flex-shrink: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .pill-container {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0;
+      }
+
+      .nav-arrow {
+        position: absolute;
+        opacity: 0;
+        background: rgba(0, 0, 0, 0.8);
+        border: none;
+        color: rgba(255, 255, 255, 0.9);
+        cursor: pointer;
+        padding: 2px 0;
+        font-size: 0.9em;
+        transition: all 0.2s ease;
+        width: 16px;
+        text-align: center;
+        border-radius: 4px;
+        z-index: 1;
+      }
+
+      .nav-arrow.prev {
+        right: 75%;
+        transform: translateX(50%);
+      }
+
+      .nav-arrow.next {
+        left: 75%;
+        transform: translateX(-50%);
+      }
+
+      .nav-arrow:hover:not(:disabled) {
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+      }
+
+      .nav-arrow:disabled {
+        color: rgba(255, 255, 255, 0.3);
+        background: rgba(0, 0, 0, 0.4);
+        cursor: not-allowed;
+      }
+
+      .comment-number {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 0.8em;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: 24px;
+        text-align: center;
+        flex-shrink: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .pill-container:hover .comment-number {
+        opacity: 0;
+      }
+
+      .pill-container:hover .nav-arrow {
+        opacity: 1;
+      }
+
+      .threadweaver-message.highlighted {
+        background: rgba(255, 255, 255, 0.15);
+        transition: background 0.2s ease;
+      }
+
+      .threadweaver-message.fade-out {
+        background: rgba(255, 255, 255, 0.05);
+        transition: background 0.3s ease;
       }
     `;
 

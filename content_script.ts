@@ -148,16 +148,43 @@ class Threadweaver {
     const idToMessage = new Map<string, MessageInfo>();
     const rootMessages: MessageInfo[] = [];
 
+    // Sort messages chronologically for processing
+    const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
+
     // Initialize all messages in the map
-    for (const message of messages) {
+    for (const message of sortedMessages) {
       message.children = [];
       idToMessage.set(message.id, message);
     }
 
+    // Track the last reply's parent for implied relationships
+    let lastReplyParentId: string | undefined = undefined;
+    let lastReplyTimestamp: number = 0;
+    const ONE_MINUTE = 60 * 1000; // milliseconds
+
     // Build the tree by linking children to parents
-    for (const message of messages) {
+    for (const message of sortedMessages) {
+      let effectiveParentId = message.parentId;
+
+      // If this message has no explicit parent, check for implied relationship
+      if (!effectiveParentId && lastReplyParentId) {
+        const timeSinceLastReply = message.timestamp - lastReplyTimestamp;
+        if (timeSinceLastReply <= ONE_MINUTE) {
+          // Within one minute of last reply, use the same parent
+          effectiveParentId = lastReplyParentId;
+          console.log(`Threadweaver: Implied parent relationship - Message ${message.id} -> Parent ${lastReplyParentId}`);
+        }
+      }
+
+      // Update tracking of last reply
       if (message.parentId) {
-        const parent = idToMessage.get(message.parentId);
+        lastReplyParentId = message.parentId;
+        lastReplyTimestamp = message.timestamp;
+      }
+
+      // Link message to its parent (explicit or implied)
+      if (effectiveParentId) {
+        const parent = idToMessage.get(effectiveParentId);
         if (parent) {
           parent.children?.push(message);
         } else {

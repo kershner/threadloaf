@@ -162,6 +162,19 @@ class Threadweaver {
                     }
                 }
                 console.log(`Threadweaver: Message ${id} is media-only`);
+            } else {
+                // Convert line breaks to spaces for preview
+                textContent = textContent.replace(/\s*[\r\n]+\s*/g, " ").trim();
+
+                // Add embed indicators to the preview if present
+                if (totalImages > 0) {
+                    textContent += " 🖼️ Image";
+                } else if (accessoriesEl) {
+                    const links = accessoriesEl.querySelectorAll("a[href]");
+                    if (links.length > 0) {
+                        textContent += " 🔗 Link";
+                    }
+                }
             }
 
             // Clone both content and accessories

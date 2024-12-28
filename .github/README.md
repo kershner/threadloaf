@@ -1,4 +1,4 @@
-<img src="threadloaf.jpg" width="64" height="64">
+<img src="threadloaf.jpg" width="128" height="128">
 
 # Threadloaf
 

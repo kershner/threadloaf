@@ -1,3 +1,5 @@
+<img src="threadloaf.jpg" width="64" height="64">
+
 # Threadloaf
 
 Threadloaf is a Chrome extension that enhances Discord's thread view with a more intuitive and readable interface.

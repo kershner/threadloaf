@@ -556,7 +556,7 @@ class Threadloaf {
         };
 
         // Initial floating button creation
-        createFloatButton(false);
+        createFloatButton(this.isThreadViewActive);
 
         // Parse messages and build tree
         const rawMessages = this.parseMessages();

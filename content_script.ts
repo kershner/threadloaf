@@ -18,7 +18,7 @@ class Threadweaver {
     private threadContainer: HTMLElement | null = null;
     private observer: MutationObserver | null = null;
     private headerObserver: MutationObserver | null = null;
-    private isThreadViewActive: boolean = true; // Track which view is active
+    private isThreadViewActive: boolean = false; // Changed from true to false to start in chat view
 
     constructor() {
         this.initialize();
@@ -36,6 +36,15 @@ class Threadweaver {
         this.setupMutationObserver();
         this.setupPolling();
         this.setupKeyboardNavigation();
+
+        // Find initial thread container and set up initial view
+        const initialThreadContainer = this.findThreadContainer();
+        if (initialThreadContainer) {
+            this.threadContainer = initialThreadContainer;
+            // Show the chat view and create float button
+            this.threadContainer.style.display = "block";
+            this.renderThread(); // This will create the button in chat view mode
+        }
     }
 
     // Locate the top-level app container
@@ -547,7 +556,7 @@ class Threadweaver {
         };
 
         // Initial floating button creation
-        createFloatButton(true);
+        createFloatButton(false);
 
         // Parse messages and build tree
         const rawMessages = this.parseMessages();
@@ -678,11 +687,20 @@ class Threadweaver {
         threadContent.appendChild(renderMessages(rootMessages));
 
         // Hide original thread container and append custom UI
-        this.threadContainer.style.display = "none";
-        const parentElement = this.threadContainer.parentElement;
-        if (parentElement) {
-            parentElement.style.position = "relative";
-            parentElement.appendChild(threadweaverContainer);
+        if (this.isThreadViewActive) {
+            this.threadContainer.style.display = "none";
+            const parentElement = this.threadContainer.parentElement;
+            if (parentElement) {
+                parentElement.style.position = "relative";
+                parentElement.appendChild(threadweaverContainer);
+            }
+        } else {
+            this.threadContainer.style.display = "block";
+            // Remove any existing threadweaver container
+            const existingContainer = document.getElementById("threadweaver-container");
+            if (existingContainer) {
+                existingContainer.remove();
+            }
         }
 
         // Try to hide header again after rendering

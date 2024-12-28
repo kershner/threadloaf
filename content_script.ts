@@ -351,7 +351,7 @@ class Threadweaver {
             });
         }
 
-        // Phase 2: Building the tree with reparenting
+        // Phase 2: Building the tree with reparenting and ghost messages
         const idToMessage = new Map<string, MessageInfo>();
         const rootMessages: MessageInfo[] = [];
 
@@ -388,9 +388,40 @@ class Threadweaver {
                     parent.children?.push(message);
                     message.parentId = effectiveParentId;
                 } else {
-                    // If we get here, something went wrong - treat as root message
-                    console.error(`Threadweaver: Failed to find parent ${effectiveParentId} for message ${message.id}`);
-                    rootMessages.push(message);
+                    // Create a ghost message for the missing parent using preview info
+                    const ghostMessage: MessageInfo = {
+                        id: effectiveParentId,
+                        author: message.parentPreview?.author || "Unknown",
+                        timestamp: message.timestamp - 1, // Place just before the child
+                        content: message.parentPreview?.content || "Message not loaded",
+                        // Use the HTML content directly from the preview
+                        htmlContent: message.parentPreview?.content || "Message not loaded",
+                        children: [message],
+                        isGhost: true,
+                    };
+
+                    // If we have HTML content, create a temporary div to properly parse emojis and formatting
+                    if (message.parentPreview?.content) {
+                        const tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = message.parentPreview.content;
+
+                        // Convert emoji images to their alt text
+                        tempDiv.querySelectorAll('img[class*="emoji"]').forEach((img) => {
+                            if (img instanceof HTMLImageElement) {
+                                const text = img.alt || img.getAttribute("aria-label") || "";
+                                if (text) {
+                                    img.replaceWith(text);
+                                }
+                            }
+                        });
+
+                        ghostMessage.content = tempDiv.textContent || "Message not loaded";
+                        ghostMessage.htmlContent = tempDiv.innerHTML;
+                    }
+
+                    idToMessage.set(effectiveParentId, ghostMessage);
+                    message.parentId = effectiveParentId;
+                    rootMessages.push(ghostMessage);
                 }
             }
         }

@@ -13,7 +13,7 @@ interface MessageInfo {
     messageNumber?: number; // Optional message number
 }
 
-class Threadweaver {
+class Threadloaf {
     private appContainer: HTMLElement | null = null;
     private threadContainer: HTMLElement | null = null;
     private observer: MutationObserver | null = null;
@@ -28,7 +28,7 @@ class Threadweaver {
     private initialize(): void {
         this.appContainer = this.findAppContainer();
         if (!this.appContainer) {
-            console.error("Threadweaver: Failed to find app container. Aborting initialization.");
+            console.error("Threadloaf: Failed to find app container. Aborting initialization.");
             return;
         }
         this.injectStyles();
@@ -79,7 +79,7 @@ class Threadweaver {
     }
 
     private addScrollerStyle(scrollerClass: string): void {
-        const styleId = `threadweaver-scroller-style-${scrollerClass}`;
+        const styleId = `threadloaf-scroller-style-${scrollerClass}`;
         // Remove any existing style first
         const existingStyle = document.getElementById(styleId);
         if (existingStyle) {
@@ -97,7 +97,7 @@ class Threadweaver {
     }
 
     private removeScrollerStyle(scrollerClass: string): void {
-        const styleId = `threadweaver-scroller-style-${scrollerClass}`;
+        const styleId = `threadloaf-scroller-style-${scrollerClass}`;
         const existingStyle = document.getElementById(styleId);
         if (existingStyle) {
             existingStyle.remove();
@@ -442,29 +442,29 @@ class Threadweaver {
     private renderThread(): void {
         if (!this.threadContainer) return;
 
-        // Clean up any existing threadweaver containers first
-        const existingContainer = document.getElementById("threadweaver-container");
+        // Clean up any existing threadloaf containers first
+        const existingContainer = document.getElementById("threadloaf-container");
         if (existingContainer) {
             existingContainer.remove();
         }
 
-        const threadweaverContainer = document.createElement("div");
-        threadweaverContainer.id = "threadweaver-container";
+        const threadloafContainer = document.createElement("div");
+        threadloafContainer.id = "threadloaf-container";
 
         // Create a separate container for thread content
         const threadContent = document.createElement("div");
-        threadContent.id = "threadweaver-content";
-        threadweaverContainer.appendChild(threadContent);
+        threadContent.id = "threadloaf-content";
+        threadloafContainer.appendChild(threadContent);
 
         // Create floating toggle button
         const createFloatButton = (isThreadView: boolean) => {
-            const existingButton = document.getElementById("threadweaver-float-button");
+            const existingButton = document.getElementById("threadloaf-float-button");
             if (existingButton) {
                 existingButton.remove();
             }
 
             const floatButton = document.createElement("div");
-            floatButton.id = "threadweaver-float-button";
+            floatButton.id = "threadloaf-float-button";
 
             // Create Chat option
             const chatOption = document.createElement("button");
@@ -500,7 +500,7 @@ class Threadweaver {
                     this.renderThread();
                     createFloatButton(true);
                     // Scroll thread view to bottom
-                    const threadContent = document.getElementById("threadweaver-content");
+                    const threadContent = document.getElementById("threadloaf-content");
                     if (threadContent) {
                         threadContent.scrollTop = threadContent.scrollHeight;
                     }
@@ -521,10 +521,10 @@ class Threadweaver {
                             scrollerElement.scrollTop = scrollerElement.scrollHeight;
                         }
                     }
-                    // Clean up threadweaver container when switching to chat view
-                    const threadweaverContainer = document.getElementById("threadweaver-container");
-                    if (threadweaverContainer) {
-                        threadweaverContainer.remove();
+                    // Clean up threadloaf container when switching to chat view
+                    const threadloafContainer = document.getElementById("threadloaf-container");
+                    if (threadloafContainer) {
+                        threadloafContainer.remove();
                     }
                     createFloatButton(false);
                 }
@@ -692,12 +692,12 @@ class Threadweaver {
             const parentElement = this.threadContainer.parentElement;
             if (parentElement) {
                 parentElement.style.position = "relative";
-                parentElement.appendChild(threadweaverContainer);
+                parentElement.appendChild(threadloafContainer);
             }
         } else {
             this.threadContainer.style.display = "block";
-            // Remove any existing threadweaver container
-            const existingContainer = document.getElementById("threadweaver-container");
+            // Remove any existing threadloaf container
+            const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
                 existingContainer.remove();
             }
@@ -717,7 +717,7 @@ class Threadweaver {
         totalMessages: number,
     ): HTMLElement {
         const el = document.createElement("div");
-        el.classList.add("threadweaver-message");
+        el.classList.add("threadloaf-message");
         if (message.isGhost) {
             el.classList.add("ghost-message");
         }
@@ -801,7 +801,7 @@ class Threadweaver {
             e.stopPropagation();
             // Find the message with the next lowest timestamp
             const currentTimestamp = message.timestamp;
-            const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message"))
+            const targetMessage = Array.from(document.querySelectorAll(".threadloaf-message"))
                 .map((el) => ({
                     element: el as HTMLElement,
                     timestamp: parseInt((el as HTMLElement).dataset.timestamp || "0"),
@@ -834,7 +834,7 @@ class Threadweaver {
             e.stopPropagation();
             // Find the message with the next highest timestamp
             const currentTimestamp = message.timestamp;
-            const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message"))
+            const targetMessage = Array.from(document.querySelectorAll(".threadloaf-message"))
                 .map((el) => ({
                     element: el as HTMLElement,
                     timestamp: parseInt((el as HTMLElement).dataset.timestamp || "0"),
@@ -986,7 +986,7 @@ class Threadweaver {
             }
 
             // Collapse any other expanded messages first
-            document.querySelectorAll(".threadweaver-message.expanded").forEach((expandedEl) => {
+            document.querySelectorAll(".threadloaf-message.expanded").forEach((expandedEl) => {
                 if (expandedEl !== el) {
                     expandedEl.classList.remove("expanded");
                     const prevContainer = expandedEl.querySelector(".preview-container") as HTMLElement;
@@ -1010,7 +1010,7 @@ class Threadweaver {
 
     private highlightMessage(number: number): void {
         // Remove any existing highlights and clear any pending fade timeouts
-        document.querySelectorAll(".threadweaver-message.highlighted").forEach((el) => {
+        document.querySelectorAll(".threadloaf-message.highlighted").forEach((el) => {
             el.classList.remove("highlighted");
             el.classList.remove("fade-out");
             const timeoutId = el.getAttribute("data-fade-timeout");
@@ -1020,7 +1020,7 @@ class Threadweaver {
         });
 
         // Find and highlight the target message
-        const messages = Array.from(document.querySelectorAll(".threadweaver-message"));
+        const messages = Array.from(document.querySelectorAll(".threadloaf-message"));
         const targetMessage = messages[number - 1];
         if (targetMessage) {
             targetMessage.classList.add("highlighted");
@@ -1129,7 +1129,7 @@ class Threadweaver {
             "keydown",
             (e) => {
                 // Only handle A/Z if we have an expanded post
-                const expandedPost = document.querySelector(".threadweaver-message.expanded");
+                const expandedPost = document.querySelector(".threadloaf-message.expanded");
                 if (!expandedPost) return;
 
                 // Don't handle navigation if we're typing in an input
@@ -1153,7 +1153,7 @@ class Threadweaver {
                     document.body.focus();
 
                     // Find all messages
-                    const allMessages = Array.from(document.querySelectorAll(".threadweaver-message"));
+                    const allMessages = Array.from(document.querySelectorAll(".threadloaf-message"));
                     const currentIndex = allMessages.indexOf(expandedPost as HTMLElement);
 
                     // Calculate target index
@@ -1190,7 +1190,7 @@ class Threadweaver {
     }
 
     private updateFloatButtonPosition(): void {
-        const floatButton = document.getElementById("threadweaver-float-button");
+        const floatButton = document.getElementById("threadloaf-float-button");
         const channelContainer = this.threadContainer?.closest('div[class*="chat_"]');
 
         if (floatButton && channelContainer) {
@@ -1203,5 +1203,5 @@ class Threadweaver {
     }
 }
 
-// Initialize the Threadweaver class
-new Threadweaver();
+// Initialize the Threadloaf class
+new Threadloaf();

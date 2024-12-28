@@ -402,6 +402,12 @@ class Threadweaver {
     private renderThread(): void {
         if (!this.threadContainer) return;
 
+        // Clean up any existing threadweaver containers first
+        const existingContainer = document.getElementById("threadweaver-container");
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+
         const threadweaverContainer = document.createElement("div");
         threadweaverContainer.id = "threadweaver-container";
 
@@ -450,13 +456,14 @@ class Threadweaver {
                             }
                         }
                     }
-                    threadweaverContainer.style.display = "block";
-                    // Ensure thread content is scrollable
+                    // Re-render thread to get latest messages
+                    this.renderThread();
+                    createFloatButton(true);
+                    // Scroll thread view to bottom
                     const threadContent = document.getElementById("threadweaver-content");
                     if (threadContent) {
-                        threadContent.style.overflowY = "auto";
+                        threadContent.scrollTop = threadContent.scrollHeight;
                     }
-                    createFloatButton(true);
                 } else {
                     // Switch to normal view
                     if (this.threadContainer) {
@@ -470,9 +477,15 @@ class Threadweaver {
                             if (scrollerClass) {
                                 this.removeScrollerStyle(scrollerClass);
                             }
+                            // Scroll chat view to bottom
+                            scrollerElement.scrollTop = scrollerElement.scrollHeight;
                         }
                     }
-                    threadweaverContainer.style.display = "none";
+                    // Clean up threadweaver container when switching to chat view
+                    const threadweaverContainer = document.getElementById("threadweaver-container");
+                    if (threadweaverContainer) {
+                        threadweaverContainer.remove();
+                    }
                     createFloatButton(false);
                 }
             };

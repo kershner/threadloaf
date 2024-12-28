@@ -19,7 +19,6 @@ class Threadweaver {
     private headerObserver: MutationObserver | null = null;
 
     constructor() {
-        console.log("Threadweaver: Initializing...");
         this.initialize();
     }
 
@@ -83,7 +82,6 @@ class Threadweaver {
 
         const messages = Array.from(this.threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map((el) => {
             const id = el.id.split("-").pop() || "";
-            console.log(`Threadweaver: Processing message ${id}`);
 
             const contentsEl = el.querySelector('[class^="contents_"]');
             if (!contentsEl) {
@@ -128,11 +126,9 @@ class Threadweaver {
             // Find accessories/embeds container
             const accessoriesId = `message-accessories-${id}`;
             const accessoriesEl = el.querySelector(`#${accessoriesId}`);
-            console.log(`Threadweaver: Looking for accessories with ID ${accessoriesId}`, accessoriesEl);
 
             // Find reactions container
             const reactionsEl = el.querySelector('[class*="reactions_"]');
-            console.log(`Threadweaver: Found reactions container:`, reactionsEl);
 
             // Debug image detection in both content and accessories
             const contentImages = messageContentEl.querySelectorAll("img:not([class*='emoji_'])");
@@ -140,25 +136,6 @@ class Threadweaver {
                 ? accessoriesEl.querySelectorAll("img:not([class*='emoji_']):not([class*='reaction'])")
                 : [];
             const totalImages = contentImages.length + accessoryImages.length;
-
-            console.log(`Threadweaver: Found ${totalImages} total images in message ${id}:`, {
-                contentImages: contentImages.length,
-                accessoryImages: accessoryImages.length,
-            });
-
-            // Log details for all images
-            [...contentImages, ...accessoryImages].forEach((img) => {
-                if (img instanceof HTMLImageElement) {
-                    console.log(`Threadweaver: Image details:`, {
-                        src: img.src,
-                        "aria-label": img.getAttribute("aria-label"),
-                        class: img.className,
-                        width: img.width,
-                        height: img.height,
-                        container: img.closest("#" + accessoriesId) ? "accessories" : "content",
-                    });
-                }
-            });
 
             // Get text content for preview, handling image-only messages
             let textContent = messageContentEl.textContent || "";
@@ -182,7 +159,6 @@ class Threadweaver {
                         textContent = "🔗 Link";
                     }
                 }
-                console.log(`Threadweaver: Message ${id} is media-only`);
             } else {
                 // Convert line breaks to spaces for preview
                 textContent = textContent.replace(/\s*[\r\n]+\s*/g, " ").trim();
@@ -256,7 +232,6 @@ class Threadweaver {
                 }
 
                 fullContent = container;
-                console.log(`Threadweaver: Converted embeds to ${uniqueLinks.length} links for message ${id}`);
             }
 
             // Fix all image sources in the cloned content
@@ -264,19 +239,11 @@ class Threadweaver {
                 const originalSrc = img.src;
                 if (img.src) {
                     img.src = img.src; // Force a re-assignment to resolve any relative URLs
-                    console.log(`Threadweaver: Processed image ${idx + 1} src:`, {
-                        original: originalSrc,
-                        new: img.src,
-                    });
                 }
                 if (img.getAttribute("aria-label")) {
                     img.alt = img.getAttribute("aria-label") || "";
-                    console.log(`Threadweaver: Copied aria-label to alt:`, img.alt);
                 }
             });
-
-            // Debug the final HTML content
-            console.log(`Threadweaver: Final HTML for message ${id}:`, fullContent.innerHTML);
 
             let parentId: string | undefined = undefined;
             let parentPreview: { author: string; content: string } | undefined = undefined;
@@ -294,7 +261,6 @@ class Threadweaver {
                         content: repliedTextContent.innerHTML,
                     };
                 }
-                console.log(`Threadweaver: Found parent ID ${parentId} with preview:`, parentPreview);
             }
 
             return {
@@ -350,7 +316,6 @@ class Threadweaver {
                 prevMessage.htmlContent += `<br><br>${message.htmlContent}`;
                 prevMessage.content += ` ${message.content}`;
                 coalescedIds.add(message.id);
-                console.log(`Threadweaver: Coalesced message ${message.id} into ${prevMessage.id}`);
             }
         }
 
@@ -376,9 +341,6 @@ class Threadweaver {
 
                 if (recentMessage) {
                     effectiveParentId = recentMessage.id;
-                    console.log(
-                        `Threadweaver: Found recent parent within 3 minutes - Message ${message.id} -> Parent ${recentMessage.id}`,
-                    );
                 } else {
                     console.log(`Threadweaver: No recent parent found for message ${message.id}, treating as root`);
                 }
@@ -391,7 +353,6 @@ class Threadweaver {
                     parent.children?.push(message);
                     // Ensure the message retains its parent ID even after being added to children
                     message.parentId = effectiveParentId;
-                    console.log(`Threadweaver: Linked message ${message.id} to parent ${effectiveParentId}`);
                 } else if (!parent && !coalescedIds.has(effectiveParentId)) {
                     // Create two ghost messages: one empty and one with preview
                     const preview = message.parentPreview || {
@@ -428,15 +389,10 @@ class Threadweaver {
                     idToMessage.set(emptyGhostId, emptyGhost);
                     rootMessages.push(emptyGhost);
                     message.parentId = effectiveParentId;
-                    console.log(`Threadweaver: Created ghost chain for message ${message.id} with preview content`);
                 } else {
-                    console.log(
-                        `Threadweaver: Parent ${effectiveParentId} was coalesced, treating message ${message.id} as root`,
-                    );
                     rootMessages.push(message);
                 }
             } else {
-                console.log(`Threadweaver: No parent for message ${message.id}, treating as root`);
                 rootMessages.push(message);
             }
         }
@@ -727,7 +683,6 @@ class Threadweaver {
 
         const messageContent = document.createElement("div");
         messageContent.classList.add("message-content-expanded");
-        console.log(`Threadweaver: Setting innerHTML for message ${message.id}:`, message.htmlContent);
         messageContent.innerHTML = message.htmlContent;
 
         // Add ghost notice if this is a ghost message
@@ -737,20 +692,6 @@ class Threadweaver {
             ghostNotice.textContent = "Full message not loaded";
             messageContent.appendChild(ghostNotice);
         }
-
-        // Debug the rendered content
-        const renderedImages = messageContent.querySelectorAll("img");
-        console.log(`Threadweaver: Rendered ${renderedImages.length} images in message ${message.id}`);
-        renderedImages.forEach((img, idx) => {
-            console.log(`Threadweaver: Rendered image ${idx + 1}/${renderedImages.length}:`, {
-                src: img.src,
-                "aria-label": img.getAttribute("aria-label"),
-                alt: img.alt,
-                width: img.width,
-                height: img.height,
-                display: window.getComputedStyle(img).display,
-            });
-        });
 
         fullContentContainer.appendChild(headerContainer);
         fullContentContainer.appendChild(messageContent);
@@ -833,10 +774,8 @@ class Threadweaver {
             );
 
             if (hasNewMessages) {
-                console.log("Threadweaver: Detected new messages.");
                 const newThreadContainer = this.findThreadContainer();
                 if (newThreadContainer && newThreadContainer !== this.threadContainer) {
-                    console.log("Threadweaver: Updating thread container with new messages.");
                     this.threadContainer = newThreadContainer;
                     this.renderThread();
                 }
@@ -847,8 +786,6 @@ class Threadweaver {
             childList: true,
             subtree: true,
         });
-
-        console.log("Threadweaver: MutationObserver attached.");
     }
 
     // Fallback: Polling to handle delayed loading or missed events
@@ -860,17 +797,12 @@ class Threadweaver {
             const newThreadContainer = this.findThreadContainer();
 
             if (newThreadContainer && newThreadContainer !== this.threadContainer) {
-                console.log("Threadweaver: Thread container with messages found via polling.");
                 this.threadContainer = newThreadContainer;
                 this.renderThread();
             }
 
             // Only stop polling if we've found messages or exceeded max attempts
             if ((newThreadContainer && newThreadContainer.children.length > 0) || attempts >= maxAttempts) {
-                console.log(
-                    "Threadweaver: Stopping polling - " +
-                        (attempts >= maxAttempts ? "max attempts reached" : "messages found"),
-                );
                 clearInterval(interval);
             }
         }, 1000);
@@ -908,7 +840,6 @@ class Threadweaver {
             const hasHeaderClass = classes.some((cls) => cls.startsWith("header_"));
             if (hasContainerClass && hasHeaderClass && header instanceof HTMLElement) {
                 header.style.display = "none";
-                console.log("Threadweaver: Found and hid channel header");
                 break;
             }
         }

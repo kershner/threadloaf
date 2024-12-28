@@ -431,26 +431,64 @@ class Threadweaver {
             const container = document.createElement("div");
             container.classList.add("message-thread");
 
-            messages.forEach((message) => {
+            // Helper function to recursively flatten the tree
+            const flattenMessages = (msgs: MessageInfo[], currentDepth: number): Array<[MessageInfo, number]> => {
+                const result: Array<[MessageInfo, number]> = [];
+                msgs.forEach((msg) => {
+                    result.push([msg, currentDepth]);
+                    if (msg.children && msg.children.length > 0) {
+                        result.push(...flattenMessages(msg.children, currentDepth + 1));
+                    }
+                });
+                return result;
+            };
+
+            // Get flattened list of [message, depth] pairs
+            const flatMessages = flattenMessages(messages, depth);
+
+            // Calculate incremental indents
+            const MAX_INDENT = 350;
+            const FIRST_LEVEL_INDENT = 40;
+            const DECAY_RATE = -Math.log(1 - FIRST_LEVEL_INDENT / MAX_INDENT);
+            const getIncrementalIndent = (level: number): number => {
+                const totalIndentPrev =
+                    level === 0 ? 0 : Math.round(MAX_INDENT * (1 - Math.exp(-DECAY_RATE * (level - 1))));
+                const totalIndentCurr = Math.round(MAX_INDENT * (1 - Math.exp(-DECAY_RATE * level)));
+                return totalIndentCurr - totalIndentPrev;
+            };
+
+            // Create message elements
+            flatMessages.forEach(([message, depth]) => {
+                const messageContainer = document.createElement("div");
+                messageContainer.style.display = "flex";
+                messageContainer.style.alignItems = "flex-start";
+                messageContainer.style.minWidth = "0"; // Allow container to shrink below children's natural width
+
+                // Create indent spacers
+                for (let i = 0; i < depth; i++) {
+                    const spacer = document.createElement("div");
+                    spacer.style.display = "inline-block";
+                    spacer.style.width = `${getIncrementalIndent(i + 1)}px`;
+                    spacer.style.flexShrink = "0"; // Prevent spacer from shrinking
+                    spacer.style.alignSelf = "stretch";
+                    messageContainer.appendChild(spacer);
+                }
+
                 const messageEl = this.createMessageElement(
                     message,
-                    depth,
+                    0, // depth is now 0 since we handle indentation here
                     messageColors.get(message.id) || "",
                     messageBold.get(message.id) || false,
                     messageNumbers.get(message.id) || 0,
                     messageNumbers.size,
                 );
+                messageEl.style.minWidth = "0"; // Allow message to shrink
+                messageEl.style.flexShrink = "1"; // Allow message to shrink
+                messageEl.style.flexGrow = "1"; // Allow message to grow
+                messageEl.style.overflow = "hidden"; // Ensure content doesn't overflow
 
-                const threadContainer = document.createElement("div");
-                threadContainer.classList.add("thread-container");
-                threadContainer.appendChild(messageEl);
-
-                if (message.children && message.children.length > 0) {
-                    const childrenContainer = renderMessages(message.children, depth + 1);
-                    threadContainer.appendChild(childrenContainer);
-                }
-
-                container.appendChild(threadContainer);
+                messageContainer.appendChild(messageEl);
+                container.appendChild(messageContainer);
             });
 
             return container;
@@ -481,21 +519,7 @@ class Threadweaver {
     ): HTMLElement {
         const el = document.createElement("div");
         el.classList.add("threadweaver-message");
-
-        // Calculate indent using exponential decay
-        const MAX_INDENT = 350;
-        const FIRST_LEVEL_INDENT = 40;
-        // Solve for decay rate: FIRST_LEVEL_INDENT = MAX_INDENT * (1 - e^(-DECAY_RATE))
-        const DECAY_RATE = -Math.log(1 - FIRST_LEVEL_INDENT / MAX_INDENT);
-        const indent = Math.round(MAX_INDENT * (1 - Math.exp(-DECAY_RATE * depth)));
-        console.log(`Threadweaver: Indent calculation for depth ${depth}:`, {
-            formula: `${MAX_INDENT} * (1 - e^(-${DECAY_RATE} * ${depth}))`,
-            expValue: Math.exp(-DECAY_RATE * depth),
-            multiplier: 1 - Math.exp(-DECAY_RATE * depth),
-            result: indent,
-            firstLevelTarget: FIRST_LEVEL_INDENT,
-        });
-        el.style.marginLeft = `${indent}px`;
+        el.style.width = "100%"; // Take up remaining space after spacers
 
         // Preview container (always visible)
         const previewContainer = document.createElement("div");

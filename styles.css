@@ -47,9 +47,9 @@ div[class*="chat_"] {
     gap: 8px;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     width: 100%;
     line-height: 1.4;
+    box-sizing: border-box;
 }
 
 .pill-container {
@@ -126,16 +126,20 @@ div[class*="chat_"] {
     overflow: hidden;
     text-overflow: ellipsis;
     min-height: 1.4em;
+    min-width: 0;
+    flex: 0 1 auto;
 }
 
 .message-author {
     color: #f3e7b5;
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    padding-right: 12px;
 }
 
 .separator {
     color: #ffffff;
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    margin: 0 4px;
 }
 
 .expanded-header {

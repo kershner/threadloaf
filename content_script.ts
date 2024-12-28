@@ -316,7 +316,7 @@ class Threadweaver {
                     const targetMessage = coalescedMessages.find((m) => m.id === recentSameAuthor.id);
                     if (targetMessage) {
                         // Coalesce this message into the target
-                        targetMessage.htmlContent += `<br><br>${message.htmlContent}`;
+                        targetMessage.htmlContent += `<br>${message.htmlContent}`;
                         targetMessage.content += ` ${message.content}`;
                         coalescedIds.add(message.id);
                         continue;
@@ -390,37 +390,33 @@ class Threadweaver {
         // Parse messages and build tree
         const rawMessages = this.parseMessages();
 
-        // Sort messages chronologically for coalescing
-        const sortedMessages = [...rawMessages].sort((a, b) => a.timestamp - b.timestamp);
-        const coalescedMessages: MessageInfo[] = [];
-        const THIRTY_SECONDS = 30 * 1000; // milliseconds
+        // Build the tree (which includes coalescing)
+        const rootMessages = this.buildMessageTree(rawMessages);
 
-        // First pass: coalesce same-user messages
-        for (let i = 0; i < sortedMessages.length; i++) {
-            const message = sortedMessages[i];
-            const prevMessage = coalescedMessages[coalescedMessages.length - 1];
+        // Flatten the tree to get all messages in display order
+        const getAllMessages = (messages: MessageInfo[]): MessageInfo[] => {
+            const result: MessageInfo[] = [];
+            const flatten = (msgs: MessageInfo[]) => {
+                msgs.forEach((msg) => {
+                    result.push(msg);
+                    if (msg.children && msg.children.length > 0) {
+                        flatten(msg.children);
+                    }
+                });
+            };
+            flatten(rootMessages);
+            return result;
+        };
 
-            if (
-                prevMessage && // There is a previous message
-                !message.parentId && // Not an explicit reply
-                message.author === prevMessage.author && // Same author
-                message.timestamp - prevMessage.timestamp <= THIRTY_SECONDS // Within 30 seconds
-            ) {
-                // Coalesce this message into the previous one
-                prevMessage.htmlContent += `<br><br>${message.htmlContent}`;
-                prevMessage.content += ` ${message.content}`;
-            } else {
-                coalescedMessages.push({ ...message });
-            }
-        }
+        const allMessages = getAllMessages(rootMessages);
 
-        // Now assign numbers to the coalesced messages
-        coalescedMessages.forEach((msg, index) => {
+        // Now assign numbers to all messages in display order
+        allMessages.forEach((msg, index) => {
             msg.messageNumber = index + 1;
         });
 
         // Sort for color grading (newest first)
-        const colorSortedMessages = [...coalescedMessages].sort((a, b) => b.timestamp - a.timestamp);
+        const colorSortedMessages = [...allMessages].sort((a, b) => b.timestamp - a.timestamp);
         const messageColors = new Map<string, string>();
         const messageBold = new Map<string, boolean>();
 
@@ -446,8 +442,6 @@ class Threadweaver {
                 messageBold.set(msg.id, false);
             }
         });
-
-        const rootMessages = this.buildMessageTree(coalescedMessages);
 
         // Clear existing container and append new content
         threadweaverContainer.innerHTML = "";
@@ -505,7 +499,7 @@ class Threadweaver {
                     messageColors.get(message.id) || "",
                     messageBold.get(message.id) || false,
                     message.messageNumber || 0,
-                    coalescedMessages.length,
+                    allMessages.length,
                 );
                 messageEl.style.minWidth = "0"; // Allow message to shrink
                 messageEl.style.flexShrink = "1"; // Allow message to shrink
@@ -622,28 +616,30 @@ class Threadweaver {
         prevArrow.disabled = commentNumber === 1;
         prevArrow.onclick = (e) => {
             e.stopPropagation();
-            if (commentNumber > 1) {
-                // Find the target message
-                const targetNumber = commentNumber - 1;
-                const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message")).find(
-                    (msg) => (msg as HTMLElement).dataset.msgNumber === targetNumber.toString(),
-                ) as HTMLElement;
+            // Find the message with the next lowest timestamp
+            const currentTimestamp = message.timestamp;
+            const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message"))
+                .map((el) => ({
+                    element: el as HTMLElement,
+                    timestamp: parseInt((el as HTMLElement).dataset.timestamp || "0"),
+                }))
+                .filter((m) => m.timestamp < currentTimestamp)
+                .sort((a, b) => b.timestamp - a.timestamp)[0]?.element;
 
-                if (targetMessage) {
-                    // Collapse current message
-                    el.classList.remove("expanded");
-                    previewContainer.style.display = "flex";
-                    fullContentContainer.style.display = "none";
+            if (targetMessage) {
+                // Collapse current message
+                el.classList.remove("expanded");
+                previewContainer.style.display = "flex";
+                fullContentContainer.style.display = "none";
 
-                    // Expand target message
-                    targetMessage.classList.add("expanded");
-                    const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
-                    const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
-                    if (targetPreview) targetPreview.style.display = "none";
-                    if (targetFull) targetFull.style.display = "block";
+                // Expand target message
+                targetMessage.classList.add("expanded");
+                const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
+                const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
+                if (targetPreview) targetPreview.style.display = "none";
+                if (targetFull) targetFull.style.display = "block";
 
-                    targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
+                targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
             }
         };
 
@@ -653,28 +649,30 @@ class Threadweaver {
         nextArrow.disabled = commentNumber === totalMessages;
         nextArrow.onclick = (e) => {
             e.stopPropagation();
-            if (commentNumber < totalMessages) {
-                // Find the target message
-                const targetNumber = commentNumber + 1;
-                const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message")).find(
-                    (msg) => (msg as HTMLElement).dataset.msgNumber === targetNumber.toString(),
-                ) as HTMLElement;
+            // Find the message with the next highest timestamp
+            const currentTimestamp = message.timestamp;
+            const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message"))
+                .map((el) => ({
+                    element: el as HTMLElement,
+                    timestamp: parseInt((el as HTMLElement).dataset.timestamp || "0"),
+                }))
+                .filter((m) => m.timestamp > currentTimestamp)
+                .sort((a, b) => a.timestamp - b.timestamp)[0]?.element;
 
-                if (targetMessage) {
-                    // Collapse current message
-                    el.classList.remove("expanded");
-                    previewContainer.style.display = "flex";
-                    fullContentContainer.style.display = "none";
+            if (targetMessage) {
+                // Collapse current message
+                el.classList.remove("expanded");
+                previewContainer.style.display = "flex";
+                fullContentContainer.style.display = "none";
 
-                    // Expand target message
-                    targetMessage.classList.add("expanded");
-                    const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
-                    const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
-                    if (targetPreview) targetPreview.style.display = "none";
-                    if (targetFull) targetFull.style.display = "block";
+                // Expand target message
+                targetMessage.classList.add("expanded");
+                const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
+                const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
+                if (targetPreview) targetPreview.style.display = "none";
+                if (targetFull) targetFull.style.display = "block";
 
-                    targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
+                targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
             }
         };
 
@@ -820,6 +818,9 @@ class Threadweaver {
             previewContainer.style.display = "none";
             fullContentContainer.style.display = "block";
         });
+
+        // When creating the element, store the timestamp
+        el.dataset.timestamp = message.timestamp.toString();
 
         return el;
     }

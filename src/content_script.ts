@@ -315,6 +315,8 @@ class Threadloaf {
         // Phase 1: Coalescing
         const coalescedMessages: MessageInfo[] = [];
         const coalescedIds = new Set<string>();
+        // Track which message each ID was coalesced into
+        const coalescedInto = new Map<string, string>();
 
         for (let i = 0; i < sortedMessages.length; i++) {
             const message = sortedMessages[i];
@@ -346,6 +348,7 @@ class Threadloaf {
                         targetMessage.htmlContent += `<br>${message.htmlContent}`;
                         targetMessage.content += ` ${message.content}`;
                         coalescedIds.add(message.id);
+                        coalescedInto.set(message.id, targetMessage.id);
                         continue;
                     }
                 }
@@ -374,8 +377,15 @@ class Threadloaf {
         for (const message of coalescedMessages) {
             let effectiveParentId = message.parentId;
 
+            // If this is an explicit reply, check if the parent was coalesced into another message
+            if (effectiveParentId) {
+                const coalescedParentId = coalescedInto.get(effectiveParentId);
+                if (coalescedParentId) {
+                    effectiveParentId = coalescedParentId;
+                }
+            }
             // If this is not an explicit reply, try to find an implicit parent
-            if (!effectiveParentId) {
+            else {
                 // Look for any recent message within 3 minutes
                 const recentMessage = coalescedMessages
                     .slice(0, coalescedMessages.indexOf(message))
@@ -397,40 +407,46 @@ class Threadloaf {
                     parent.children?.push(message);
                     message.parentId = effectiveParentId;
                 } else {
-                    // Create a ghost message for the missing parent using preview info
-                    const ghostMessage: MessageInfo = {
-                        id: effectiveParentId,
-                        author: message.parentPreview?.author || "Unknown",
-                        timestamp: message.timestamp - 1, // Place just before the child
-                        content: message.parentPreview?.content || "Message not loaded",
-                        // Use the HTML content directly from the preview
-                        htmlContent: message.parentPreview?.content || "Message not loaded",
-                        children: [message],
-                        isGhost: true,
-                    };
+                    // Only create a ghost message if this was an explicit reply and the parent wasn't coalesced
+                    if (message.parentId && !coalescedInto.has(message.parentId)) {
+                        // Create a ghost message for the missing parent using preview info
+                        const ghostMessage: MessageInfo = {
+                            id: effectiveParentId,
+                            author: message.parentPreview?.author || "Unknown",
+                            timestamp: message.timestamp - 1, // Place just before the child
+                            content: message.parentPreview?.content || "Message not loaded",
+                            // Use the HTML content directly from the preview
+                            htmlContent: message.parentPreview?.content || "Message not loaded",
+                            children: [message],
+                            isGhost: true,
+                        };
 
-                    // If we have HTML content, create a temporary div to properly parse emojis and formatting
-                    if (message.parentPreview?.content) {
-                        const tempDiv = document.createElement("div");
-                        tempDiv.innerHTML = message.parentPreview.content;
+                        // If we have HTML content, create a temporary div to properly parse emojis and formatting
+                        if (message.parentPreview?.content) {
+                            const tempDiv = document.createElement("div");
+                            tempDiv.innerHTML = message.parentPreview.content;
 
-                        // Convert emoji images to their alt text
-                        tempDiv.querySelectorAll('img[class*="emoji"]').forEach((img) => {
-                            if (img instanceof HTMLImageElement) {
-                                const text = img.alt || img.getAttribute("aria-label") || "";
-                                if (text) {
-                                    img.replaceWith(text);
+                            // Convert emoji images to their alt text
+                            tempDiv.querySelectorAll('img[class*="emoji"]').forEach((img) => {
+                                if (img instanceof HTMLImageElement) {
+                                    const text = img.alt || img.getAttribute("aria-label") || "";
+                                    if (text) {
+                                        img.replaceWith(text);
+                                    }
                                 }
-                            }
-                        });
+                            });
 
-                        ghostMessage.content = tempDiv.textContent || "Message not loaded";
-                        ghostMessage.htmlContent = tempDiv.innerHTML;
+                            ghostMessage.content = tempDiv.textContent || "Message not loaded";
+                            ghostMessage.htmlContent = tempDiv.innerHTML;
+                        }
+
+                        idToMessage.set(effectiveParentId, ghostMessage);
+                        message.parentId = effectiveParentId;
+                        rootMessages.push(ghostMessage);
+                    } else {
+                        // If parent was coalesced or this is an implicit parent, make it a root message
+                        rootMessages.push(message);
                     }
-
-                    idToMessage.set(effectiveParentId, ghostMessage);
-                    message.parentId = effectiveParentId;
-                    rootMessages.push(ghostMessage);
                 }
             }
         }

@@ -7,7 +7,7 @@
     "content_scripts": [
       {
         "matches": ["*://discord.com/*"],
-        "js": ["dist/content_script.js"]
+        "js": ["content_script.js"]
       }
     ],
     "web_accessible_resources": [{

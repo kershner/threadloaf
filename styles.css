@@ -261,4 +261,85 @@ div[class*="chat_"] {
     background: rgba(0, 0, 0, 0.2);
     padding: 4px;
     border-radius: 0 0 4px 4px;
+}
+
+.embeds-container {
+    padding: 0 12px;
+    margin-top: 16px;
+}
+
+.reactions-container {
+    padding: 12px;
+    margin-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.existing-reactions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Ensure Discord's reaction buttons align properly */
+.existing-reactions [class*="reactions_"] {
+    display: flex;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+}
+
+/* Remove interactive styles from cloned reactions */
+.existing-reactions [class*="reaction_"] {
+    cursor: default !important;
+    filter: none !important;
+    background: none !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+    padding: 4px 8px !important;
+}
+
+.existing-reactions [class*="reaction_"]:hover {
+    background: none !important;
+    filter: none !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.existing-reactions [class*="reaction_"]:active {
+    transform: none !important;
+}
+
+/* Ensure reaction count matches non-interactive state */
+.existing-reactions [class*="reaction_"] [class*="reactionCount_"] {
+    color: rgba(255, 255, 255, 0.5) !important;
+    margin-left: 4px !important;
+}
+
+.add-reaction-button {
+    background: rgba(255, 255, 255, 0.03);
+    border: none;
+    color: rgba(255, 255, 255, 0.2);
+    min-width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    cursor: not-allowed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    opacity: 0.5;
+}
+
+.add-reaction-button:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.add-reaction-icon {
+    font-size: 20px;
+    line-height: 1;
 } 

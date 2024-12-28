@@ -685,6 +685,17 @@ class Threadweaver {
         messageContent.classList.add("message-content-expanded");
         messageContent.innerHTML = message.htmlContent;
 
+        // Create a container for embeds if they exist
+        const embedsContainer = document.createElement("div");
+        embedsContainer.classList.add("embeds-container");
+
+        // Move embeds from messageContent to embedsContainer
+        const embedLinks = messageContent.querySelector(".embed-links");
+        if (embedLinks) {
+            messageContent.removeChild(embedLinks);
+            embedsContainer.appendChild(embedLinks);
+        }
+
         // Add ghost notice if this is a ghost message
         if (message.isGhost) {
             const ghostNotice = document.createElement("div");
@@ -695,6 +706,40 @@ class Threadweaver {
 
         fullContentContainer.appendChild(headerContainer);
         fullContentContainer.appendChild(messageContent);
+
+        // Only add embeds container if there are embeds
+        if (embedLinks) {
+            fullContentContainer.appendChild(embedsContainer);
+        }
+
+        // Create reactions container (always present in expanded view)
+        const reactionsContainer = document.createElement("div");
+        reactionsContainer.classList.add("reactions-container");
+
+        // Add the "Add Reaction" button first
+        const addReactionButton = document.createElement("button");
+        addReactionButton.classList.add("add-reaction-button");
+        addReactionButton.innerHTML = '<span class="add-reaction-icon">+</span>';
+        addReactionButton.title = "Add Reaction (coming soon)";
+        addReactionButton.disabled = true;
+        addReactionButton.onclick = (e) => {
+            e.stopPropagation();
+        };
+        reactionsContainer.appendChild(addReactionButton);
+
+        // Move existing reactions if present
+        const reactionsClone = fullContentContainer.querySelector('[class*="reactions_"]');
+        if (reactionsClone) {
+            reactionsClone.remove();
+            // Create a wrapper for existing reactions
+            const existingReactions = document.createElement("div");
+            existingReactions.classList.add("existing-reactions");
+            existingReactions.appendChild(reactionsClone);
+            reactionsContainer.appendChild(existingReactions);
+        }
+
+        fullContentContainer.appendChild(reactionsContainer);
+
         fullContentContainer.style.display = "none";
 
         // Create expanded view pill container

@@ -15,7 +15,8 @@ if [ $? -ne 0 ]; then
 fi 
 
 # Copy static files to dist
-cp -f manifest.json ../dist/manifest.json
-cp -f styles.css ../dist/styles.css
+cp -f manifest.json ../dist/
+cp -f styles.css ../dist/
+cp -f threadloaf-128.jpg ../dist/
 
 echo "Build completed successfully!"

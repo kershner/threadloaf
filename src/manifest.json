@@ -3,15 +3,18 @@
     "name": "Threadloaf",
     "version": "1.0",
     "description": "Enhances Discord's thread view",
+    "icons": {
+        "128": "threadloaf-128.jpg"
+    },
     "permissions": [],
     "content_scripts": [
       {
-        "matches": ["*://discord.com/*"],
+        "matches": ["*://discord.com/channels/*"],
         "js": ["content_script.js"]
       }
     ],
     "web_accessible_resources": [{
-      "resources": ["styles.css"],
+      "resources": ["styles.css", "threadloaf-128.jpg"],
       "matches": ["*://discord.com/*"]
     }]
   }

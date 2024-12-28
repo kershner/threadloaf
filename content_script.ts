@@ -697,6 +697,100 @@ class Threadweaver {
         fullContentContainer.appendChild(messageContent);
         fullContentContainer.style.display = "none";
 
+        // Create expanded view pill container
+        const expandedPillContainer = pillContainer.cloneNode(true) as HTMLElement;
+        expandedPillContainer.classList.add("expanded-pill-container");
+
+        // Update event listeners for expanded view navigation arrows
+        const expandedPrevArrow = expandedPillContainer.querySelector(".nav-arrow.prev") as HTMLButtonElement;
+        const expandedNextArrow = expandedPillContainer.querySelector(".nav-arrow.next") as HTMLButtonElement;
+        const expandedUpArrow = expandedPillContainer.querySelector(".nav-arrow.up") as HTMLButtonElement;
+
+        if (expandedPrevArrow) {
+            expandedPrevArrow.onclick = (e) => {
+                e.stopPropagation();
+                if (commentNumber > 1) {
+                    // Find the target message
+                    const targetNumber = commentNumber - 1;
+                    const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message")).find(
+                        (msg) => msg.querySelector(".comment-number")?.textContent === targetNumber.toString(),
+                    ) as HTMLElement;
+
+                    if (targetMessage) {
+                        // Collapse current message
+                        el.classList.remove("expanded");
+                        previewContainer.style.display = "flex";
+                        fullContentContainer.style.display = "none";
+
+                        // Expand target message
+                        targetMessage.classList.add("expanded");
+                        const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
+                        const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
+                        if (targetPreview) targetPreview.style.display = "none";
+                        if (targetFull) targetFull.style.display = "block";
+
+                        targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                }
+            };
+        }
+
+        if (expandedNextArrow) {
+            expandedNextArrow.onclick = (e) => {
+                e.stopPropagation();
+                if (commentNumber < totalMessages) {
+                    // Find the target message
+                    const targetNumber = commentNumber + 1;
+                    const targetMessage = Array.from(document.querySelectorAll(".threadweaver-message")).find(
+                        (msg) => msg.querySelector(".comment-number")?.textContent === targetNumber.toString(),
+                    ) as HTMLElement;
+
+                    if (targetMessage) {
+                        // Collapse current message
+                        el.classList.remove("expanded");
+                        previewContainer.style.display = "flex";
+                        fullContentContainer.style.display = "none";
+
+                        // Expand target message
+                        targetMessage.classList.add("expanded");
+                        const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
+                        const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
+                        if (targetPreview) targetPreview.style.display = "none";
+                        if (targetFull) targetFull.style.display = "block";
+
+                        targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                }
+            };
+        }
+
+        if (expandedUpArrow) {
+            expandedUpArrow.onclick = (e) => {
+                e.stopPropagation();
+                if (message.parentId) {
+                    const parentEl = document.querySelector(`[data-msg-id="${message.parentId}"]`) as HTMLElement;
+                    if (parentEl) {
+                        // Collapse current message
+                        el.classList.remove("expanded");
+                        previewContainer.style.display = "flex";
+                        fullContentContainer.style.display = "none";
+
+                        // Expand parent message
+                        parentEl.classList.add("expanded");
+                        const parentPreview = parentEl.querySelector(".preview-container") as HTMLElement;
+                        const parentFull = parentEl.querySelector(".full-content") as HTMLElement;
+                        if (parentPreview) parentPreview.style.display = "none";
+                        if (parentFull) parentFull.style.display = "block";
+
+                        parentEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                }
+            };
+        }
+
+        // Insert expanded pill container before the expanded author
+        headerContainer.insertBefore(expandedPillContainer, expandedAuthor);
+
         el.appendChild(previewContainer);
         el.appendChild(fullContentContainer);
         el.dataset.msgId = message.id;

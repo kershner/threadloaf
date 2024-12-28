@@ -68,13 +68,29 @@ class Threadweaver {
     }
 
     private addScrollerStyle(scrollerClass: string): void {
+        const styleId = `threadweaver-scroller-style-${scrollerClass}`;
+        // Remove any existing style first
+        const existingStyle = document.getElementById(styleId);
+        if (existingStyle) {
+            existingStyle.remove();
+        }
+
         const style = document.createElement("style");
+        style.id = styleId;
         style.textContent = `
-      div.${scrollerClass} {
-        overflow-y: hidden !important;
-      }
-    `;
+            div.${scrollerClass} {
+                overflow-y: hidden !important;
+            }
+        `;
         document.head.appendChild(style);
+    }
+
+    private removeScrollerStyle(scrollerClass: string): void {
+        const styleId = `threadweaver-scroller-style-${scrollerClass}`;
+        const existingStyle = document.getElementById(styleId);
+        if (existingStyle) {
+            existingStyle.remove();
+        }
     }
 
     // Parse all messages in the thread container
@@ -387,6 +403,104 @@ class Threadweaver {
         const threadweaverContainer = document.createElement("div");
         threadweaverContainer.id = "threadweaver-container";
 
+        // Create a separate container for thread content
+        const threadContent = document.createElement("div");
+        threadContent.id = "threadweaver-content";
+        threadweaverContainer.appendChild(threadContent);
+
+        // Create floating toggle button
+        const createFloatButton = (isThreadView: boolean) => {
+            const existingButton = document.getElementById("threadweaver-float-button");
+            if (existingButton) {
+                existingButton.remove();
+            }
+
+            const floatButton = document.createElement("div");
+            floatButton.id = "threadweaver-float-button";
+
+            // Create Chat option
+            const chatOption = document.createElement("button");
+            chatOption.className = `toggle-option ${!isThreadView ? "active" : ""}`;
+            chatOption.textContent = "Chat";
+
+            // Create Thread option
+            const threadOption = document.createElement("button");
+            threadOption.className = `toggle-option ${isThreadView ? "active" : ""}`;
+            threadOption.textContent = "Thread";
+
+            const handleClick = (newIsThreadView: boolean) => {
+                if (newIsThreadView === isThreadView) return; // No change needed
+
+                if (newIsThreadView) {
+                    // Switch to thread view
+                    if (this.threadContainer) {
+                        this.threadContainer.style.display = "none";
+                        // Re-add our scroll override
+                        const scrollerElement = this.threadContainer.closest('div[class*="scroller_"]');
+                        if (scrollerElement) {
+                            const scrollerClass = Array.from(scrollerElement.classList).find((className) =>
+                                className.startsWith("scroller_"),
+                            );
+                            if (scrollerClass) {
+                                this.addScrollerStyle(scrollerClass);
+                            }
+                        }
+                    }
+                    threadweaverContainer.style.display = "block";
+                    // Ensure thread content is scrollable
+                    const threadContent = document.getElementById("threadweaver-content");
+                    if (threadContent) {
+                        threadContent.style.overflowY = "auto";
+                    }
+                    createFloatButton(true);
+                } else {
+                    // Switch to normal view
+                    if (this.threadContainer) {
+                        this.threadContainer.style.display = "block";
+                        // Remove our scroll override
+                        const scrollerElement = this.threadContainer.closest('div[class*="scroller_"]');
+                        if (scrollerElement) {
+                            const scrollerClass = Array.from(scrollerElement.classList).find((className) =>
+                                className.startsWith("scroller_"),
+                            );
+                            if (scrollerClass) {
+                                this.removeScrollerStyle(scrollerClass);
+                            }
+                        }
+                    }
+                    threadweaverContainer.style.display = "none";
+                    createFloatButton(false);
+                }
+            };
+
+            chatOption.onclick = () => handleClick(false);
+            threadOption.onclick = () => handleClick(true);
+
+            floatButton.appendChild(chatOption);
+            floatButton.appendChild(threadOption);
+            document.body.appendChild(floatButton);
+
+            // Position the button initially
+            this.updateFloatButtonPosition();
+
+            // Set up resize observer for the channel container
+            const channelContainer = this.threadContainer?.closest('div[class*="chat_"]');
+            if (channelContainer) {
+                const resizeObserver = new ResizeObserver(() => {
+                    this.updateFloatButtonPosition();
+                });
+                resizeObserver.observe(channelContainer);
+            }
+
+            // Also handle window resize
+            window.addEventListener("resize", () => {
+                this.updateFloatButtonPosition();
+            });
+        };
+
+        // Initial floating button creation
+        createFloatButton(true);
+
         // Parse messages and build tree
         const rawMessages = this.parseMessages();
 
@@ -443,8 +557,8 @@ class Threadweaver {
             }
         });
 
-        // Clear existing container and append new content
-        threadweaverContainer.innerHTML = "";
+        // Clear only the thread content
+        threadContent.innerHTML = "";
 
         const renderMessages = (messages: MessageInfo[], depth = 0) => {
             const container = document.createElement("div");
@@ -513,7 +627,7 @@ class Threadweaver {
             return container;
         };
 
-        threadweaverContainer.appendChild(renderMessages(rootMessages));
+        threadContent.appendChild(renderMessages(rootMessages));
 
         // Hide original thread container and append custom UI
         this.threadContainer.style.display = "none";
@@ -1007,6 +1121,19 @@ class Threadweaver {
             },
             true,
         ); // Use capture phase to handle event before Discord
+    }
+
+    private updateFloatButtonPosition(): void {
+        const floatButton = document.getElementById("threadweaver-float-button");
+        const channelContainer = this.threadContainer?.closest('div[class*="chat_"]');
+
+        if (floatButton && channelContainer) {
+            const channelRect = channelContainer.getBoundingClientRect();
+            const channelCenter = channelRect.left + channelRect.width / 2;
+
+            // Position relative to channel container, let CSS handle the transform
+            floatButton.style.left = `${channelCenter}px`;
+        }
     }
 }
 

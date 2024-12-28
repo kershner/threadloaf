@@ -135,8 +135,10 @@ class Threadweaver {
             console.log(`Threadweaver: Found reactions container:`, reactionsEl);
 
             // Debug image detection in both content and accessories
-            const contentImages = messageContentEl.querySelectorAll("img");
-            const accessoryImages = accessoriesEl ? accessoriesEl.querySelectorAll("img:not([class*='emoji_'])") : [];
+            const contentImages = messageContentEl.querySelectorAll("img:not([class*='emoji_'])");
+            const accessoryImages = accessoriesEl
+                ? accessoriesEl.querySelectorAll("img:not([class*='emoji_']):not([class*='reaction'])")
+                : [];
             const totalImages = contentImages.length + accessoryImages.length;
 
             console.log(`Threadweaver: Found ${totalImages} total images in message ${id}:`, {
@@ -205,6 +207,11 @@ class Threadweaver {
                 // Add reactions if present
                 if (reactionsEl) {
                     const reactionsClone = reactionsEl.cloneNode(true) as HTMLElement;
+                    // Remove the "add reaction" button
+                    const addReactionBtn = reactionsClone.querySelector('div[class*="reactionBtn_"]');
+                    if (addReactionBtn) {
+                        addReactionBtn.remove();
+                    }
                     container.appendChild(reactionsClone);
                 }
 

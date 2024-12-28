@@ -7,7 +7,9 @@ interface MessageInfo {
     content: string;
     htmlContent: string;
     parentId?: string; // Parent message ID (if reply)
+    parentPreview?: { author: string; content: string }; // Preview of parent message if available
     children?: MessageInfo[]; // List of child messages
+    isGhost?: boolean; // Whether this is a placeholder for a missing message
 }
 
 class Threadweaver {
@@ -259,11 +261,22 @@ class Threadweaver {
             console.log(`Threadweaver: Final HTML for message ${id}:`, fullContent.innerHTML);
 
             let parentId: string | undefined = undefined;
+            let parentPreview: { author: string; content: string } | undefined = undefined;
             const replyContextMaybe = el.querySelector('[id^="message-reply-context-"]');
             if (replyContextMaybe) {
                 const parentContentEl = replyContextMaybe.querySelector('[id^="message-content-"]');
                 parentId = parentContentEl?.id.split("-").pop() || "";
-                console.log(`Threadweaver: Found parent ID ${parentId} for message ${id}`);
+
+                // Extract parent preview content and author
+                const repliedTextContent = replyContextMaybe.querySelector('[class*="repliedTextContent_"]');
+                const parentAuthorEl = replyContextMaybe.querySelector('[class*="username_"]');
+                if (repliedTextContent && parentAuthorEl) {
+                    parentPreview = {
+                        author: parentAuthorEl.textContent?.trim().replace(/^@/, "") || "Unknown",
+                        content: repliedTextContent.innerHTML,
+                    };
+                }
+                console.log(`Threadweaver: Found parent ID ${parentId} with preview:`, parentPreview);
             }
 
             return {
@@ -273,6 +286,7 @@ class Threadweaver {
                 content: textContent,
                 htmlContent: fullContent.innerHTML,
                 parentId,
+                parentPreview,
                 children: [],
             };
         });
@@ -360,9 +374,46 @@ class Threadweaver {
                     // Ensure the message retains its parent ID even after being added to children
                     message.parentId = effectiveParentId;
                     console.log(`Threadweaver: Linked message ${message.id} to parent ${effectiveParentId}`);
+                } else if (!parent && !coalescedIds.has(effectiveParentId)) {
+                    // Create two ghost messages: one empty and one with preview
+                    const preview = message.parentPreview || {
+                        author: "Unknown",
+                        content: "Message not loaded",
+                    };
+
+                    // Create ghost with preview content
+                    const previewGhost: MessageInfo = {
+                        id: effectiveParentId,
+                        author: preview.author,
+                        timestamp: message.timestamp - 1,
+                        content: preview.content,
+                        htmlContent: preview.content,
+                        children: [message],
+                        isGhost: true,
+                    };
+
+                    // Create empty ghost parent
+                    const emptyGhostId = `ghost-parent-${effectiveParentId}`;
+                    const emptyGhost: MessageInfo = {
+                        id: emptyGhostId,
+                        author: "",
+                        timestamp: message.timestamp - 2,
+                        content: "Message not loaded",
+                        htmlContent: "Message not loaded",
+                        children: [previewGhost],
+                        isGhost: true,
+                    };
+
+                    // Link the messages together
+                    previewGhost.parentId = emptyGhostId;
+                    idToMessage.set(effectiveParentId, previewGhost);
+                    idToMessage.set(emptyGhostId, emptyGhost);
+                    rootMessages.push(emptyGhost);
+                    message.parentId = effectiveParentId;
+                    console.log(`Threadweaver: Created ghost chain for message ${message.id} with preview content`);
                 } else {
                     console.log(
-                        `Threadweaver: Parent ${effectiveParentId} not found for message ${message.id}, treating as root`,
+                        `Threadweaver: Parent ${effectiveParentId} was coalesced, treating message ${message.id} as root`,
                     );
                     rootMessages.push(message);
                 }
@@ -519,6 +570,9 @@ class Threadweaver {
     ): HTMLElement {
         const el = document.createElement("div");
         el.classList.add("threadweaver-message");
+        if (message.isGhost) {
+            el.classList.add("ghost-message");
+        }
         el.style.width = "100%"; // Take up remaining space after spacers
 
         // Preview container (always visible)
@@ -563,19 +617,23 @@ class Threadweaver {
             }
         };
 
-        // Add comment number pill
-        const numberPill = document.createElement("span");
-        numberPill.classList.add("comment-number");
-        numberPill.textContent = commentNumber.toString();
+        // Add comment number pill only for non-ghost messages
+        if (!message.isGhost) {
+            const numberPill = document.createElement("span");
+            numberPill.classList.add("comment-number");
+            numberPill.textContent = commentNumber.toString();
+            pillContainer.appendChild(numberPill);
+        }
 
         pillContainer.appendChild(prevArrow);
         pillContainer.appendChild(upArrow);
-        pillContainer.appendChild(numberPill);
-        pillContainer.appendChild(nextArrow);
+        if (!message.isGhost) {
+            pillContainer.appendChild(nextArrow);
+        }
 
         const contentPreview = document.createElement("span");
         contentPreview.classList.add("message-content", "preview");
-        contentPreview.textContent = message.content;
+        contentPreview.innerHTML = message.isGhost ? message.content : message.content;
         contentPreview.style.color = color;
         if (isBold) {
             contentPreview.style.fontWeight = "bold";
@@ -591,8 +649,11 @@ class Threadweaver {
 
         previewContainer.appendChild(pillContainer);
         previewContainer.appendChild(contentPreview);
-        previewContainer.appendChild(separator);
-        previewContainer.appendChild(authorSpan);
+        // Only add separator and author if we have an author (empty ghost messages don't)
+        if (message.author) {
+            previewContainer.appendChild(separator);
+            previewContainer.appendChild(authorSpan);
+        }
 
         // Full content container (shown when expanded)
         const fullContentContainer = document.createElement("div");
@@ -629,6 +690,14 @@ class Threadweaver {
         messageContent.classList.add("message-content-expanded");
         console.log(`Threadweaver: Setting innerHTML for message ${message.id}:`, message.htmlContent);
         messageContent.innerHTML = message.htmlContent;
+
+        // Add ghost notice if this is a ghost message
+        if (message.isGhost) {
+            const ghostNotice = document.createElement("div");
+            ghostNotice.classList.add("ghost-notice");
+            ghostNotice.textContent = "Full message not loaded";
+            messageContent.appendChild(ghostNotice);
+        }
 
         // Debug the rendered content
         const renderedImages = messageContent.querySelectorAll("img");

@@ -208,4 +208,38 @@ div[class*="chat_"] {
 .threadweaver-message.fade-out {
     background: rgba(255, 255, 255, 0.05);
     transition: background 0.3s ease;
+}
+
+.ghost-message {
+    opacity: 0.5;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+}
+
+.ghost-message .message-content.preview {
+    font-style: italic;
+}
+
+.ghost-message .message-author {
+    font-style: italic;
+    color: rgba(243, 231, 181, 0.5);
+}
+
+.ghost-content {
+    position: relative;
+    padding-bottom: 24px;
+}
+
+.ghost-notice {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-style: italic;
+    font-size: 0.9em;
+    color: rgba(255, 255, 255, 0.5);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px;
+    border-radius: 0 0 4px 4px;
 } 

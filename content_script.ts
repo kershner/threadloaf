@@ -556,6 +556,9 @@ class Threadweaver {
             const temp = document.createElement("div");
             temp.innerHTML = message.htmlContent;
 
+            // Remove reactions
+            temp.querySelectorAll('[class*="reactions_"]').forEach((el) => el.remove());
+
             // Replace emoji images with their alt text
             temp.querySelectorAll('img[class*="emoji"]').forEach((img) => {
                 if (img instanceof HTMLImageElement) {

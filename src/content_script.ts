@@ -11,6 +11,7 @@ interface MessageInfo {
     children?: MessageInfo[]; // List of child messages
     isGhost?: boolean; // Whether this is a placeholder for a missing message
     messageNumber?: number; // Optional message number
+    originalElement?: HTMLElement; // Reference to the original Discord message element
 }
 
 class Threadloaf {
@@ -300,6 +301,7 @@ class Threadloaf {
                 parentId,
                 parentPreview,
                 children: [],
+                originalElement: el as HTMLElement,
             };
         });
 
@@ -918,9 +920,65 @@ class Threadloaf {
 
         const replyButton = document.createElement("button");
         replyButton.classList.add("reply-button");
-        replyButton.textContent = "Reply";
+        replyButton.textContent = "Actions";
         replyButton.onclick = (e) => {
-            e.stopPropagation(); // Prevent collapsing when clicking reply
+            e.stopPropagation(); // Prevent collapsing when clicking actions
+            console.log("Actions button clicked");
+
+            if (!message.originalElement) {
+                console.error("No original element reference found for message");
+                return;
+            }
+            console.log("Found original message:", message.originalElement);
+
+            // Try to trigger context menu on each ancestor until one responds
+            let currentElement: Element | null = message.originalElement.querySelector('[id^="message-content-"]');
+            if (!currentElement) {
+                console.error("Message content element not found in:", message.originalElement);
+                return;
+            }
+            console.log("Starting from content element:", currentElement);
+
+            while (currentElement && currentElement !== message.originalElement.parentElement) {
+                console.log("Trying context menu on element:", currentElement);
+                const contextEvent = new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    button: 2,
+                    buttons: 2,
+                });
+
+                const wasHandled = !currentElement.dispatchEvent(contextEvent);
+                console.log("Context menu event was handled:", wasHandled);
+
+                if (wasHandled) {
+                    console.log("Context menu event was handled by element:", currentElement);
+                    // Try immediately first
+                    setTimeout(() => {
+                        const menuElement = document.querySelector('div[class*="menu_"]');
+                        if (menuElement && menuElement instanceof HTMLElement) {
+                            console.log("Found menu element immediately");
+                            this.positionMenu(menuElement, replyButton);
+                        } else {
+                            console.log("Menu not found immediately, trying again in 50ms");
+                            // Try again after a delay if not found immediately
+                            setTimeout(() => {
+                                const menuElement = document.querySelector('div[class*="menu_"]');
+                                if (menuElement && menuElement instanceof HTMLElement) {
+                                    console.log("Found menu element after delay");
+                                    this.positionMenu(menuElement, replyButton);
+                                } else {
+                                    console.log("Menu element not found even after delay");
+                                }
+                            }, 50);
+                        }
+                    }, 0);
+                    break;
+                }
+                currentElement = currentElement.parentElement;
+                console.log("Moving to parent element:", currentElement);
+            }
         };
 
         headerContainer.appendChild(expandedPillContainer);
@@ -1225,6 +1283,33 @@ class Threadloaf {
             floatButton.style.left = `${channelCenter}px`;
         }
     }
+
+    // Helper function to position the menu
+    private positionMenu = (menuElement: HTMLElement, replyButton: HTMLElement) => {
+        const buttonRect = replyButton.getBoundingClientRect();
+        console.log("Button rect:", buttonRect);
+
+        // Determine if we're in the bottom half of the viewport
+        const isBottomHalf = buttonRect.bottom > window.innerHeight / 2;
+
+        // Create a style element for our menu positioning
+        const styleId = "threadloaf-menu-position";
+        let styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+            styleEl = document.createElement("style");
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+
+        // Update the style with the new position
+        styleEl.textContent = `
+            div[class*="menu_"] {
+                position: fixed !important;
+                ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`} !important;
+                right: ${window.innerWidth - buttonRect.right}px !important;
+            }
+        `;
+    };
 }
 
 // Initialize the Threadloaf class

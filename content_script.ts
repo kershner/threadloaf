@@ -18,6 +18,7 @@ class Threadweaver {
     private threadContainer: HTMLElement | null = null;
     private observer: MutationObserver | null = null;
     private headerObserver: MutationObserver | null = null;
+    private isThreadViewActive: boolean = true; // Track which view is active
 
     constructor() {
         this.initialize();
@@ -50,7 +51,8 @@ class Threadweaver {
                 return el.getAttribute("data-list-id") === "chat-messages" && el.children.length > 0;
             }) || null;
 
-        if (threadContainer) {
+        if (threadContainer && this.isThreadViewActive) {
+            // Only apply scroll override in thread view
             // Find and disable scrolling on the original scroller
             const scrollerElement = threadContainer.closest('div[class*="scroller_"]');
             if (scrollerElement) {
@@ -430,6 +432,8 @@ class Threadweaver {
 
             const handleClick = (newIsThreadView: boolean) => {
                 if (newIsThreadView === isThreadView) return; // No change needed
+
+                this.isThreadViewActive = newIsThreadView; // Update the view state
 
                 if (newIsThreadView) {
                     // Switch to thread view

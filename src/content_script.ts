@@ -1073,6 +1073,14 @@ class Threadloaf {
                 if (newThreadContainer && newThreadContainer !== this.threadContainer) {
                     this.threadContainer = newThreadContainer;
                     this.renderThread();
+
+                    // If we're in thread view, scroll to bottom
+                    if (this.isThreadViewActive) {
+                        const threadContent = document.getElementById("threadloaf-content");
+                        if (threadContent) {
+                            threadContent.scrollTop = threadContent.scrollHeight;
+                        }
+                    }
                 }
             }
         });

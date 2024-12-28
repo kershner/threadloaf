@@ -162,8 +162,19 @@ class Threadweaver {
 
             // Get text content for preview, handling image-only messages
             let textContent = messageContentEl.textContent || "";
+
+            // If there's no text content, check if it's just emojis
             if (!textContent) {
-                if (totalImages > 0) {
+                const emojiContent = Array.from(messageContentEl.querySelectorAll('img[class*="emoji"]'))
+                    .map(
+                        (img) =>
+                            (img instanceof HTMLImageElement ? img.alt : "") || img.getAttribute("aria-label") || "",
+                    )
+                    .join("");
+
+                if (emojiContent) {
+                    textContent = emojiContent;
+                } else if (totalImages > 0) {
                     textContent = "🖼️ Image";
                 } else if (accessoriesEl) {
                     const links = accessoriesEl.querySelectorAll("a[href]");
@@ -640,7 +651,28 @@ class Threadweaver {
 
         const contentPreview = document.createElement("span");
         contentPreview.classList.add("message-content", "preview");
-        contentPreview.innerHTML = message.isGhost ? message.content : message.content;
+
+        // For non-ghost messages, handle emojis specially
+        if (!message.isGhost) {
+            // Create a temporary container to parse the content
+            const temp = document.createElement("div");
+            temp.innerHTML = message.htmlContent;
+
+            // Replace emoji images with their alt text
+            temp.querySelectorAll('img[class*="emoji"]').forEach((img) => {
+                if (img instanceof HTMLImageElement) {
+                    const text = img.alt || img.getAttribute("aria-label") || "";
+                    if (text) {
+                        img.replaceWith(text);
+                    }
+                }
+            });
+
+            contentPreview.innerHTML = temp.textContent || "";
+        } else {
+            contentPreview.innerHTML = message.content;
+        }
+
         contentPreview.style.color = color;
         if (isBold) {
             contentPreview.style.fontWeight = "bold";

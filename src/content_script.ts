@@ -314,143 +314,69 @@ class Threadloaf {
         const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
         const THREE_MINUTES = 3 * 60 * 1000; // milliseconds
 
-        // Phase 1: Coalescing
-        const coalescedMessages: MessageInfo[] = [];
-        const coalescedIds = new Set<string>();
-        // Track which message each ID was coalesced into
-        const coalescedInto = new Map<string, string>();
-
-        for (let i = 0; i < sortedMessages.length; i++) {
-            const message = sortedMessages[i];
-
-            // Skip if this message has been coalesced into another
-            if (coalescedIds.has(message.id)) continue;
-
-            // If this isn't an explicit reply, look for a recent message from the same author
-            if (!message.parentId) {
-                const recentSameAuthorIndex = sortedMessages
-                    .slice(0, i)
-                    .reverse()
-                    .findIndex(
-                        (m) =>
-                            !coalescedIds.has(m.id) &&
-                            m.author === message.author &&
-                            message.timestamp - m.timestamp <= THREE_MINUTES,
-                    );
-
-                if (recentSameAuthorIndex !== -1) {
-                    // Convert from reverse index to actual index
-                    const actualIndex = i - 1 - recentSameAuthorIndex;
-                    const recentSameAuthor = sortedMessages[actualIndex];
-
-                    // Find the corresponding message in coalescedMessages
-                    const targetMessage = coalescedMessages.find((m) => m.id === recentSameAuthor.id);
-                    if (targetMessage) {
-                        // Coalesce this message into the target
-                        targetMessage.htmlContent += `<br>${message.htmlContent}`;
-                        targetMessage.content += ` ${message.content}`;
-                        coalescedIds.add(message.id);
-                        coalescedInto.set(message.id, targetMessage.id);
-                        continue;
-                    }
-                }
-            }
-
-            // Add a deep copy of the message
-            coalescedMessages.push({
-                ...message,
-                htmlContent: message.htmlContent,
-                content: message.content,
-                children: [],
-            });
-        }
-
-        // Phase 2: Building the tree with reparenting and ghost messages
+        // Initialize message map and root messages array
         const idToMessage = new Map<string, MessageInfo>();
         const rootMessages: MessageInfo[] = [];
 
-        // Initialize all messages in the map
-        for (const message of coalescedMessages) {
+        // First pass: Initialize all messages in the map
+        for (const message of sortedMessages) {
             message.children = [];
             idToMessage.set(message.id, message);
         }
 
-        // Now handle parenting
-        for (const message of coalescedMessages) {
-            let effectiveParentId = message.parentId;
+        // Second pass: Build the tree
+        for (let i = 0; i < sortedMessages.length; i++) {
+            const message = sortedMessages[i];
+            const previousMessage = i > 0 ? sortedMessages[i - 1] : null;
 
-            // If this is an explicit reply, check if the parent was coalesced into another message
-            if (effectiveParentId) {
-                const coalescedParentId = coalescedInto.get(effectiveParentId);
-                if (coalescedParentId) {
-                    effectiveParentId = coalescedParentId;
-                }
-            }
-            // If this is not an explicit reply, try to find an implicit parent
-            else {
-                // Look for any recent message within 3 minutes
-                const recentMessage = coalescedMessages
-                    .slice(0, coalescedMessages.indexOf(message))
-                    .reverse()
-                    .find((m) => message.timestamp - m.timestamp <= THREE_MINUTES);
-
-                if (recentMessage) {
-                    effectiveParentId = recentMessage.id;
+            // Rule 1: Honor explicit replies
+            if (message.parentId) {
+                const parent = idToMessage.get(message.parentId);
+                if (parent) {
+                    parent.children?.push(message);
                 } else {
-                    rootMessages.push(message);
+                    // Create ghost message for missing parent
+                    const ghostMessage: MessageInfo = {
+                        id: message.parentId,
+                        author: message.parentPreview?.author || "Unknown",
+                        timestamp: message.timestamp - 1,
+                        content: message.parentPreview?.content || "Message not loaded",
+                        htmlContent: message.parentPreview?.content || "Message not loaded",
+                        children: [message],
+                        isGhost: true,
+                    };
+                    idToMessage.set(message.parentId, ghostMessage);
+                    rootMessages.push(ghostMessage);
+                }
+                continue;
+            }
+
+            // For non-explicit replies, check previous message
+            if (previousMessage && message.timestamp - previousMessage.timestamp <= THREE_MINUTES) {
+                if (message.author === previousMessage.author) {
+                    // Rule 2: Same author within 3 minutes - use same parent as previous message
+                    if (previousMessage.parentId) {
+                        const parent = idToMessage.get(previousMessage.parentId);
+                        if (parent) {
+                            parent.children?.push(message);
+                            message.parentId = previousMessage.parentId;
+                            continue;
+                        }
+                    } else {
+                        // If previous message is a root message, this one should be too
+                        rootMessages.push(message);
+                        continue;
+                    }
+                } else {
+                    // Rule 3: Different author within 3 minutes - treat as reply to previous message
+                    previousMessage.children?.push(message);
+                    message.parentId = previousMessage.id;
                     continue;
                 }
             }
 
-            // Link message to its parent
-            if (effectiveParentId) {
-                const parent = idToMessage.get(effectiveParentId);
-                if (parent) {
-                    parent.children?.push(message);
-                    message.parentId = effectiveParentId;
-                } else {
-                    // Only create a ghost message if this was an explicit reply and the parent wasn't coalesced
-                    if (message.parentId && !coalescedInto.has(message.parentId)) {
-                        // Create a ghost message for the missing parent using preview info
-                        const ghostMessage: MessageInfo = {
-                            id: effectiveParentId,
-                            author: message.parentPreview?.author || "Unknown",
-                            timestamp: message.timestamp - 1, // Place just before the child
-                            content: message.parentPreview?.content || "Message not loaded",
-                            // Use the HTML content directly from the preview
-                            htmlContent: message.parentPreview?.content || "Message not loaded",
-                            children: [message],
-                            isGhost: true,
-                        };
-
-                        // If we have HTML content, create a temporary div to properly parse emojis and formatting
-                        if (message.parentPreview?.content) {
-                            const tempDiv = document.createElement("div");
-                            tempDiv.innerHTML = message.parentPreview.content;
-
-                            // Convert emoji images to their alt text
-                            tempDiv.querySelectorAll('img[class*="emoji"]').forEach((img) => {
-                                if (img instanceof HTMLImageElement) {
-                                    const text = img.alt || img.getAttribute("aria-label") || "";
-                                    if (text) {
-                                        img.replaceWith(text);
-                                    }
-                                }
-                            });
-
-                            ghostMessage.content = tempDiv.textContent || "Message not loaded";
-                            ghostMessage.htmlContent = tempDiv.innerHTML;
-                        }
-
-                        idToMessage.set(effectiveParentId, ghostMessage);
-                        message.parentId = effectiveParentId;
-                        rootMessages.push(ghostMessage);
-                    } else {
-                        // If parent was coalesced or this is an implicit parent, make it a root message
-                        rootMessages.push(message);
-                    }
-                }
-            }
+            // If no rules applied, this is a root message
+            rootMessages.push(message);
         }
 
         return rootMessages;

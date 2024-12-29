@@ -1,103 +1,63 @@
 # Message Threading Rules
 
-This document describes the rules for coalescing consecutive messages and building a message tree structure. The goal is to create a natural conversation flow by combining related messages and establishing parent-child relationships.
+This document describes the rules for building a message tree structure. The goal is to create a natural conversation flow by establishing parent-child relationships between messages.
 
-## Overview
+## Core Rules
 
-The process happens in two phases:
-1. Coalescing consecutive messages from the same author
-2. Building the message tree with explicit and implicit parent-child relationships
+1. **Explicit Replies**: If a message is an explicit reply (using Discord's reply feature), that relationship is always honored without evaluating any other rules.
 
-## Phase 1: Message Coalescing
+2. **Same Author Within 3 Minutes**: If a message is not an explicit reply, look at the immediately preceding message. If that message is:
+   - Within 3 minutes
+   - From the same author
+   Then treat the new message as having the same parent as the preceding message. This allows users to write multi-line messages that all become children of the same parent.
 
-Messages are coalesced (combined) when they meet ALL of the following criteria:
+3. **Different Author Within 3 Minutes**: If a message is not an explicit reply, look at the immediately preceding message. If that message is:
+   - Within 3 minutes
+   - From a different author
+   Then treat the new message as a direct reply to the preceding message. This allows users to have back-and-forth discussions without using the "reply" function.
 
-1. The messages are from the same author
-2. The messages are within a 3-minute window of each other
-3. Neither message is an explicit reply to another message
-4. The earlier message hasn't already been coalesced into another message
+## Example Scenarios
 
-### Coalescing Process
-
-1. Sort all messages chronologically by timestamp
-2. For each message (current message):
-   - Skip if this message has already been coalesced into another message
-   - If this message is NOT an explicit reply:
-     - Look backwards through recent messages to find the most recent message that:
-       - Is from the same author
-       - Is within 3 minutes of the current message
-       - Hasn't been coalesced into another message
-     - If such a message is found:
-       - Combine the current message into that message by:
-         - Appending the current message's HTML content with a `<br>` separator
-         - Appending the current message's text content with a space separator
-         - Mark the current message as coalesced
-         - Record which message it was coalesced into
-     - If no such message is found:
-       - Keep the current message as a standalone message
-
-## Phase 2: Message Tree Building
-
-After coalescing, build a tree structure using both explicit replies and implicit relationships.
-
-### Rules for Finding a Parent
-
-For each message in chronological order:
-
-1. If the message has an explicit parent (is a reply):
-   - Check if the parent message was coalesced into another message
-   - If it was coalesced, use the coalesced message as the parent instead
-   - If the parent message exists in our set:
-     - Make this message a child of that parent
-   - If the parent message doesn't exist and wasn't coalesced:
-     - Create a ghost message to represent the missing parent
-     - Make this message a child of the ghost message
-   - If the parent message doesn't exist but was coalesced:
-     - Make this message a root message
-
-2. If the message has no explicit parent:
-   - Look for the most recent message within 3 minutes
-   - If found:
-     - Make this message a child of that message
-   - If not found:
-     - Make this message a root message
-
-### Ghost Messages
-
-Ghost messages are created only when ALL of these conditions are met:
-1. The message is an explicit reply to another message
-2. The parent message is not found in our current set
-3. The parent message was not coalesced into another message
-
-Ghost messages contain:
-- The parent message's ID
-- Author information if available (from reply preview)
-- Content preview if available (from reply preview)
-- A timestamp 1ms before their child message
-- An `isGhost` flag set to true
-
-## Example Scenario
-
-Consider this sequence of messages, all within 3 minutes:
+### Scenario 1: Multi-line message from same author
 ```
-A1: "Hello" (non-reply)
-B1: "Hi" (non-reply)
-A2: "How are you?" (non-reply)
-B2: "Good thanks" (non-reply)
-C1: "Me too" (explicit reply to B2)
+A1: "Hello" (reply to X)
+A2: "How are you?" (within 3min of A1)
+A3: "I have a question" (within 3min of A2)
+```
+Result:
+```
+X
+├── A1 (reply to X)
+├── A2 (same parent as A1)
+└── A3 (same parent as A1)
 ```
 
-The result will be:
+### Scenario 2: Back-and-forth conversation
 ```
-A1+A2 (coalesced: "Hello\nHow are you?")
-└── B1+B2 (coalesced: "Hi\nGood thanks", implicitly parented to A1+A2)
-    └── C1 (explicitly parented to B1+B2 because B2 was coalesced into it)
+A1: "Hello"
+B1: "Hi" (within 3min of A1)
+A2: "How are you?" (within 3min of B1)
+B2: "Good thanks" (within 3min of A2)
+```
+Result:
+```
+A1
+└── B1 (reply to A1)
+    └── A2 (reply to B1)
+        └── B2 (reply to A2)
 ```
 
-## Implementation Notes
-
-1. Always process messages in chronological order
-2. Maintain a map of which messages were coalesced into which other messages
-3. When coalescing, preserve the earlier message's ID as the combined message ID
-4. Ghost messages should only be created as a last resort when we can't find the real parent or a coalesced version of it
-5. The 3-minute window applies to both coalescing and implicit parenting 
+### Scenario 3: Mixed explicit and implicit replies
+```
+A1: "Hello"
+B1: [explicit reply to A1] "Hi"
+A2: "How are you?" (within 3min of B1)
+C1: [explicit reply to A1] "Hey there"
+```
+Result:
+```
+A1
+├── B1 (explicit reply)
+│   └── A2 (implicit reply to B1)
+└── C1 (explicit reply)
+``` 

@@ -1007,7 +1007,7 @@ class Threadloaf {
 
             // Update the style with the new position, aligning menu's left with button's left
             styleEl.textContent = `
-                div[class*="menu_"] {
+                div[class*="menu_"]:not([class*="submenu_"]) {
                     position: fixed !important;
                     ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`};
                     left: ${buttonRect.left}px;

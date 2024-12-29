@@ -210,10 +210,27 @@ class Threadloaf {
             if (accessoriesEl) {
                 // Convert embeds to plain text links (excluding reactions)
                 const links = Array.from(
-                    accessoriesEl.querySelectorAll<HTMLAnchorElement>('a[href]:not([class*="reaction"])'),
+                    accessoriesEl.querySelectorAll<HTMLAnchorElement>(
+                        'a[href]:not([class*="reaction"]):not([class*="originalLink_"]):not(article *)',
+                    ),
                 ).map((a) => a.href);
-                const images = Array.from(
-                    accessoriesEl.querySelectorAll<HTMLImageElement>('img[src]:not([data-type="emoji"])'),
+
+                // Handle image wrappers specially
+                const imageWrappers = Array.from(
+                    accessoriesEl.querySelectorAll('div[class*="imageWrapper_"]:not(article *)'),
+                );
+                const imageLinks = imageWrappers
+                    .map((wrapper) => {
+                        const link = wrapper.querySelector('a[class*="originalLink_"]');
+                        return link instanceof HTMLAnchorElement ? link.href : null;
+                    })
+                    .filter((url): url is string => url !== null);
+
+                // Handle regular images (not in wrappers)
+                const standaloneImages = Array.from(
+                    accessoriesEl.querySelectorAll<HTMLImageElement>(
+                        'img[src]:not([data-type="emoji"]):not(.lazyImg_)',
+                    ),
                 ).map((img) => img.src);
 
                 // Create a container for content, links, and reactions
@@ -232,7 +249,7 @@ class Threadloaf {
                 }
 
                 // Add all unique links
-                const uniqueLinks = [...new Set([...links, ...images])];
+                const uniqueLinks = [...new Set([...links, ...imageLinks])];
                 if (uniqueLinks.length > 0) {
                     const linkList = document.createElement("div");
                     linkList.classList.add("embed-links");
@@ -240,14 +257,19 @@ class Threadloaf {
                     uniqueLinks.forEach((url) => {
                         const link = document.createElement("a");
                         link.href = url;
+                        // Add indicator based on URL pattern
+                        let prefix = "🔗";
+                        if (imageLinks.includes(url)) {
+                            prefix = "🖼️";
+                        }
                         // Truncate long URLs
                         if (url.length > 70) {
                             const start = url.slice(0, 35);
                             const end = url.slice(-30);
-                            link.textContent = `${start}...${end}`;
+                            link.textContent = `${prefix} ${start}...${end}`;
                             link.title = url; // Show full URL on hover
                         } else {
-                            link.textContent = url;
+                            link.textContent = `${prefix} ${url}`;
                         }
                         link.target = "_blank";
                         link.rel = "noopener noreferrer";

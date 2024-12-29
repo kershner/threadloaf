@@ -675,6 +675,16 @@ class Threadloaf {
             if (parentElement) {
                 parentElement.style.position = "relative";
                 parentElement.appendChild(threadloafContainer);
+
+                // Expand the first post when entering thread view
+                const firstMessage = document.querySelector(".threadloaf-message") as HTMLElement;
+                if (firstMessage) {
+                    firstMessage.classList.add("expanded");
+                    const previewContainer = firstMessage.querySelector(".preview-container") as HTMLElement;
+                    const fullContentContainer = firstMessage.querySelector(".full-content") as HTMLElement;
+                    if (previewContainer) previewContainer.style.display = "none";
+                    if (fullContentContainer) fullContentContainer.style.display = "block";
+                }
             }
         } else {
             this.threadContainer.style.display = "block";

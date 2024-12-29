@@ -147,7 +147,6 @@ div[class*="chat_"] {
 .message-content.preview {
     overflow: hidden;
     text-overflow: ellipsis;
-    min-height: 1.4em;
     min-width: 0;
     flex: 0 1 auto;
 }

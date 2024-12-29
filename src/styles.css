@@ -203,6 +203,8 @@ div[class*="chat_"] {
     cursor: pointer;
     font-size: 0.9em;
     transition: background 0.2s ease;
+    order: -1;
+    flex-shrink: 0;
 }
 
 .reply-button:hover {
@@ -281,7 +283,7 @@ div[class*="chat_"] {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .existing-reactions {

@@ -935,73 +935,9 @@ class Threadloaf {
         timestamp.classList.add("expanded-timestamp");
         timestamp.textContent = new Date(message.timestamp).toLocaleString();
 
-        const replyButton = document.createElement("button");
-        replyButton.classList.add("reply-button");
-        replyButton.textContent = "Actions";
-        replyButton.onclick = (e) => {
-            e.stopPropagation(); // Prevent collapsing when clicking actions
-            console.log("Actions button clicked");
-
-            if (!message.originalElement) {
-                console.error("No original element reference found for message");
-                return;
-            }
-            console.log("Found original message:", message.originalElement);
-
-            // Try to trigger context menu on each ancestor until one responds
-            let currentElement: Element | null = message.originalElement.querySelector('[id^="message-content-"]');
-            if (!currentElement) {
-                console.error("Message content element not found in:", message.originalElement);
-                return;
-            }
-            console.log("Starting from content element:", currentElement);
-
-            // Set up menu positioning style before triggering context menu
-            const buttonRect = replyButton.getBoundingClientRect();
-            const isBottomHalf = buttonRect.bottom > window.innerHeight / 2;
-            const styleId = "threadloaf-menu-position";
-            let styleEl = document.getElementById(styleId);
-            if (!styleEl) {
-                styleEl = document.createElement("style");
-                styleEl.id = styleId;
-                document.head.appendChild(styleEl);
-            }
-
-            // Update the style with the new position
-            styleEl.textContent = `
-                div[class*="menu_"] {
-                    position: fixed !important;
-                    ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`} !important;
-                    right: ${window.innerWidth - buttonRect.right}px !important;
-                }
-            `;
-
-            while (currentElement && currentElement !== message.originalElement.parentElement) {
-                console.log("Trying context menu on element:", currentElement);
-                const contextEvent = new MouseEvent("contextmenu", {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window,
-                    button: 2,
-                    buttons: 2,
-                });
-
-                const wasHandled = !currentElement.dispatchEvent(contextEvent);
-                console.log("Context menu event was handled:", wasHandled);
-
-                if (wasHandled) {
-                    console.log("Context menu event was handled by element:", currentElement);
-                    break;
-                }
-                currentElement = currentElement.parentElement;
-                console.log("Moving to parent element:", currentElement);
-            }
-        };
-
-        headerContainer.appendChild(expandedPillContainer);
-        headerContainer.appendChild(expandedAuthor);
         rightContainer.appendChild(timestamp);
-        rightContainer.appendChild(replyButton);
+        headerContainer.appendChild(expandedAuthor);
+        headerContainer.insertBefore(expandedPillContainer, expandedAuthor);
         headerContainer.appendChild(rightContainer);
 
         const messageContent = document.createElement("div");
@@ -1036,6 +972,71 @@ class Threadloaf {
         const reactionsContainer = document.createElement("div");
         reactionsContainer.classList.add("reactions-container");
 
+        // Create and add the Actions button first
+        const replyButton = document.createElement("button");
+        replyButton.classList.add("reply-button");
+        replyButton.textContent = "Actions";
+        replyButton.onclick = (e) => {
+            e.stopPropagation(); // Prevent collapsing when clicking actions
+            console.log("Actions button clicked");
+
+            if (!message.originalElement) {
+                console.error("No original element reference found for message");
+                return;
+            }
+            console.log("Found original message:", message.originalElement);
+
+            // Try to trigger context menu on each ancestor until one responds
+            let currentElement: Element | null = message.originalElement.querySelector('[id^="message-content-"]');
+            if (!currentElement) {
+                console.error("Message content element not found in:", message.originalElement);
+                return;
+            }
+            console.log("Starting from content element:", currentElement);
+
+            // Set up menu positioning style before triggering context menu
+            const buttonRect = replyButton.getBoundingClientRect();
+            const isBottomHalf = buttonRect.bottom > window.innerHeight / 2;
+            const styleId = "threadloaf-menu-position";
+            let styleEl = document.getElementById(styleId);
+            if (!styleEl) {
+                styleEl = document.createElement("style");
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+
+            // Update the style with the new position, aligning menu's left with button's left
+            styleEl.textContent = `
+                div[class*="menu_"] {
+                    position: fixed !important;
+                    ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`};
+                    left: ${buttonRect.left}px;
+                }
+            `;
+
+            while (currentElement && currentElement !== message.originalElement.parentElement) {
+                console.log("Trying context menu on element:", currentElement);
+                const contextEvent = new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    button: 2,
+                    buttons: 2,
+                });
+
+                const wasHandled = !currentElement.dispatchEvent(contextEvent);
+                console.log("Context menu event was handled:", wasHandled);
+
+                if (wasHandled) {
+                    console.log("Context menu event was handled by element:", currentElement);
+                    break;
+                }
+                currentElement = currentElement.parentElement;
+                console.log("Moving to parent element:", currentElement);
+            }
+        };
+        reactionsContainer.appendChild(replyButton);
+
         // Move existing reactions if present
         const reactionsClone = fullContentContainer.querySelector('[class*="reactions_"]');
         if (reactionsClone) {
@@ -1050,9 +1051,6 @@ class Threadloaf {
         fullContentContainer.appendChild(reactionsContainer);
 
         fullContentContainer.style.display = "none";
-
-        // Insert expanded pill container before the expanded author
-        headerContainer.insertBefore(expandedPillContainer, expandedAuthor);
 
         el.appendChild(previewContainer);
         el.appendChild(fullContentContainer);

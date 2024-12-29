@@ -1036,17 +1036,6 @@ class Threadloaf {
         const reactionsContainer = document.createElement("div");
         reactionsContainer.classList.add("reactions-container");
 
-        // Add the "Add Reaction" button first
-        const addReactionButton = document.createElement("button");
-        addReactionButton.classList.add("add-reaction-button");
-        addReactionButton.innerHTML = '<span class="add-reaction-icon">+</span>';
-        addReactionButton.title = "Add Reaction (coming soon)";
-        addReactionButton.disabled = true;
-        addReactionButton.onclick = (e) => {
-            e.stopPropagation();
-        };
-        reactionsContainer.appendChild(addReactionButton);
-
         // Move existing reactions if present
         const reactionsClone = fullContentContainer.querySelector('[class*="reactions_"]');
         if (reactionsClone) {

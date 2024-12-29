@@ -313,10 +313,10 @@ class Threadloaf {
                             if (url.length > 70) {
                                 const start = url.slice(0, 35);
                                 const end = url.slice(-30);
-                                link.textContent = `${prefix} ${start}...${end}`;
+                                link.textContent = `${prefix}\u00A0${start}...${end}`;
                                 link.title = url; // Show full URL on hover
                             } else {
-                                link.textContent = `${prefix} ${url}`;
+                                link.textContent = `${prefix}\u00A0${url}`;
                             }
                             link.target = "_blank";
                             link.rel = "noopener noreferrer";

@@ -1150,22 +1150,18 @@ class Threadloaf {
             }
 
             if (shouldRerender) {
-                // If we have a thread container already, just re-render
-                if (this.threadContainer) {
+                // If we don't have a thread container yet, try to find it
+                const newThreadContainer = this.findThreadContainer();
+                if (newThreadContainer) {
+                    this.threadContainer = newThreadContainer;
                     this.renderThread();
+
                     // If we're in thread view, scroll to bottom only for new messages
                     if (this.isThreadViewActive) {
                         const threadContent = document.getElementById("threadloaf-content");
                         if (threadContent) {
                             threadContent.scrollTop = threadContent.scrollHeight;
                         }
-                    }
-                } else {
-                    // If we don't have a thread container yet, try to find it
-                    const newThreadContainer = this.findThreadContainer();
-                    if (newThreadContainer) {
-                        this.threadContainer = newThreadContainer;
-                        this.renderThread();
                     }
                 }
             }

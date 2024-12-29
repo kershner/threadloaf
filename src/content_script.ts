@@ -1,5 +1,21 @@
 // content_script.ts
 
+/*
+ * IMPORTANT: Discord Class/ID Naming Pattern
+ *
+ * Discord dynamically generates unique suffixes for all classes and IDs.
+ * - Classes use underscores: "foo_[random]"  (e.g., "container_c2668b", "scroller_e2e187")
+ * - IDs use hyphens: "bar-[random]"  (e.g., "message-content-123456", "chat-messages-789")
+ *
+ * NEVER do exact matches like:
+ *   element.classList.contains("container_")  // WRONG
+ *   document.getElementById("message-content") // WRONG
+ *
+ * ALWAYS use pattern matching:
+ *   element.classList.some(cls => cls.startsWith("container_"))  // Correct
+ *   document.querySelector('[id^="message-content-"]')  // Correct
+ */
+
 interface MessageInfo {
     id: string;
     author: string;
@@ -21,6 +37,8 @@ class Threadloaf {
     private observer: MutationObserver | null = null;
     private headerObserver: MutationObserver | null = null;
     private isThreadViewActive: boolean = false; // Changed from true to false to start in chat view
+    private isTopLoaded: boolean = false;
+    private isLoadingMore: boolean = false; // Add flag to track load more state
 
     constructor() {
         this.initialize();
@@ -465,6 +483,9 @@ class Threadloaf {
     private renderThread(): void {
         if (!this.threadContainer) return;
 
+        // Check if we're at the top of the thread
+        this.isTopLoaded = this.checkIfTopLoaded();
+
         // Store currently expanded message ID before re-render
         const expandedMessage = document.querySelector(".threadloaf-message.expanded");
         const expandedMessageId = expandedMessage?.getAttribute("data-msg-id");
@@ -492,6 +513,14 @@ class Threadloaf {
 
             const floatButton = document.createElement("div");
             floatButton.id = "threadloaf-float-button";
+
+            // Create Load Up button as a separate element
+            const loadUpButton = this.createLoadUpButton();
+            loadUpButton.style.marginLeft = "8px"; // Change margin to left side
+
+            // Create toggle container
+            const toggleContainer = document.createElement("div");
+            toggleContainer.className = "toggle-container";
 
             // Create Chat option
             const chatOption = document.createElement("button");
@@ -560,8 +589,11 @@ class Threadloaf {
             chatOption.onclick = () => handleClick(false);
             threadOption.onclick = () => handleClick(true);
 
-            floatButton.appendChild(chatOption);
-            floatButton.appendChild(threadOption);
+            // Append buttons in the right order
+            toggleContainer.appendChild(chatOption);
+            toggleContainer.appendChild(threadOption);
+            floatButton.appendChild(toggleContainer);
+            floatButton.appendChild(loadUpButton); // Move load button to end
             document.body.appendChild(floatButton);
 
             // Position the button initially
@@ -1195,14 +1227,13 @@ class Threadloaf {
             }
 
             if (shouldRerender) {
-                // If we don't have a thread container yet, try to find it
                 const newThreadContainer = this.findThreadContainer();
                 if (newThreadContainer) {
                     this.threadContainer = newThreadContainer;
                     this.renderThread();
 
-                    // If we're in thread view, scroll to bottom only for new messages
-                    if (this.isThreadViewActive) {
+                    // Only scroll to bottom if we're in thread view AND we're not loading more messages
+                    if (this.isThreadViewActive && !this.isLoadingMore) {
                         const threadContent = document.getElementById("threadloaf-content");
                         if (threadContent) {
                             threadContent.scrollTop = threadContent.scrollHeight;
@@ -1350,9 +1381,152 @@ class Threadloaf {
             const channelRect = channelContainer.getBoundingClientRect();
             const channelCenter = channelRect.left + channelRect.width / 2;
 
-            // Position relative to channel container, let CSS handle the transform
-            floatButton.style.left = `${channelCenter}px`;
+            // Position the container so the toggle is centered
+            const toggleContainer = floatButton.querySelector(".toggle-container") as HTMLElement;
+            if (toggleContainer) {
+                const toggleWidth = toggleContainer.offsetWidth;
+                const loadButton = floatButton.querySelector(".load-up-button") as HTMLElement;
+                const loadButtonWidth = loadButton ? loadButton.offsetWidth : 0;
+                const spacing = 8; // Space between buttons
+
+                // Calculate position that centers the toggle and puts load button to the right
+                const adjustedCenter = channelCenter + (loadButton ? (loadButtonWidth + spacing) / 2 : 0);
+
+                floatButton.style.left = `${adjustedCenter}px`;
+            } else {
+                floatButton.style.left = `${channelCenter}px`;
+            }
         }
+    }
+
+    private checkIfTopLoaded(): boolean {
+        if (!this.threadContainer) {
+            console.log("checkIfTopLoaded: No thread container found");
+            return false;
+        }
+
+        console.log("checkIfTopLoaded: Checking children of thread container:", this.threadContainer.children);
+
+        // Check if there's a container div with a heading-xxl/extrabold class as a direct child
+        const topContainer = Array.from(this.threadContainer.children).find((child) => {
+            if (!(child instanceof HTMLElement)) {
+                console.log("checkIfTopLoaded: Child is not an HTMLElement:", child);
+                return false;
+            }
+
+            console.log("checkIfTopLoaded: Checking child classes:", child.classList);
+            const hasContainerClass = Array.from(child.classList).some((cls) => cls.startsWith("container_"));
+            if (!hasContainerClass) {
+                console.log("checkIfTopLoaded: Child doesn't have container_ class:", child);
+                return false;
+            }
+
+            console.log("checkIfTopLoaded: Found container, checking for heading:", child.children);
+            const hasHeading = Array.from(child.children).some((grandChild) => {
+                if (!(grandChild instanceof HTMLElement)) {
+                    console.log("checkIfTopLoaded: Grandchild is not an HTMLElement:", grandChild);
+                    return false;
+                }
+
+                console.log("checkIfTopLoaded: Checking grandchild:", {
+                    tagName: grandChild.tagName,
+                    classList: grandChild.classList,
+                });
+
+                const isHeading =
+                    grandChild.tagName === "H3" &&
+                    Array.from(grandChild.classList).some(
+                        (cls) => cls.startsWith("heading-xxl") || cls.startsWith("extrabold"),
+                    );
+
+                if (isHeading) {
+                    console.log("checkIfTopLoaded: Found heading with required classes");
+                }
+                return isHeading;
+            });
+
+            return hasHeading;
+        });
+
+        const result = !!topContainer;
+        console.log("checkIfTopLoaded: Final result:", result);
+        return result;
+    }
+
+    private createLoadUpButton(): HTMLButtonElement {
+        const loadUpButton = document.createElement("button");
+        loadUpButton.className = "load-up-button";
+        loadUpButton.textContent = "Load More";
+        loadUpButton.title = "Load earlier messages";
+        loadUpButton.style.opacity = this.isTopLoaded ? "0" : "1";
+        loadUpButton.style.visibility = this.isTopLoaded ? "hidden" : "visible";
+
+        let isLoading = false;
+        loadUpButton.onclick = async () => {
+            if (isLoading) return;
+
+            const scrollerElement = this.threadContainer?.closest('div[class*="scroller_"]');
+            if (!scrollerElement) return;
+
+            isLoading = true;
+            this.isLoadingMore = true; // Set flag before loading
+            loadUpButton.disabled = true;
+
+            // If we're in thread view, temporarily switch to chat view
+            const wasInThreadView = this.isThreadViewActive;
+            if (wasInThreadView) {
+                // Switch to chat view
+                this.threadContainer!.style.display = "block";
+                const threadloafContainer = document.getElementById("threadloaf-container");
+                if (threadloafContainer) {
+                    threadloafContainer.remove();
+                }
+                // Remove our scroll override
+                const scrollerClass = Array.from(scrollerElement.classList).find((className) =>
+                    className.startsWith("scroller_"),
+                );
+                if (scrollerClass) {
+                    this.removeScrollerStyle(scrollerClass);
+                }
+            }
+
+            // Scroll and dispatch event
+            scrollerElement.scrollTo({ top: 0 });
+            const scrollEvent = new Event("scroll", {
+                bubbles: true,
+                cancelable: true,
+            });
+            scrollerElement.dispatchEvent(scrollEvent);
+
+            // Wait a bit for the load to happen
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
+            // Switch back to thread view if we were in it
+            if (wasInThreadView) {
+                this.isThreadViewActive = true;
+                this.renderThread();
+
+                // After rendering, scroll to top of thread view
+                const threadContent = document.getElementById("threadloaf-content");
+                if (threadContent) {
+                    threadContent.scrollTop = 0;
+                }
+            }
+
+            // Re-enable after a delay
+            setTimeout(() => {
+                isLoading = false;
+                this.isLoadingMore = false;
+                loadUpButton.disabled = false;
+
+                // Check if we're at the top after loading
+                this.isTopLoaded = this.checkIfTopLoaded();
+                loadUpButton.style.opacity = this.isTopLoaded ? "0" : "1";
+                loadUpButton.style.visibility = this.isTopLoaded ? "hidden" : "visible";
+            }, 1000);
+        };
+
+        return loadUpButton;
     }
 }
 

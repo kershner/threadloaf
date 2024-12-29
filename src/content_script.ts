@@ -956,6 +956,26 @@ class Threadloaf {
             }
             console.log("Starting from content element:", currentElement);
 
+            // Set up menu positioning style before triggering context menu
+            const buttonRect = replyButton.getBoundingClientRect();
+            const isBottomHalf = buttonRect.bottom > window.innerHeight / 2;
+            const styleId = "threadloaf-menu-position";
+            let styleEl = document.getElementById(styleId);
+            if (!styleEl) {
+                styleEl = document.createElement("style");
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+
+            // Update the style with the new position
+            styleEl.textContent = `
+                div[class*="menu_"] {
+                    position: fixed !important;
+                    ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`} !important;
+                    right: ${window.innerWidth - buttonRect.right}px !important;
+                }
+            `;
+
             while (currentElement && currentElement !== message.originalElement.parentElement) {
                 console.log("Trying context menu on element:", currentElement);
                 const contextEvent = new MouseEvent("contextmenu", {
@@ -971,26 +991,6 @@ class Threadloaf {
 
                 if (wasHandled) {
                     console.log("Context menu event was handled by element:", currentElement);
-                    // Try immediately first
-                    setTimeout(() => {
-                        const menuElement = document.querySelector('div[class*="menu_"]');
-                        if (menuElement && menuElement instanceof HTMLElement) {
-                            console.log("Found menu element immediately");
-                            this.positionMenu(menuElement, replyButton);
-                        } else {
-                            console.log("Menu not found immediately, trying again in 50ms");
-                            // Try again after a delay if not found immediately
-                            setTimeout(() => {
-                                const menuElement = document.querySelector('div[class*="menu_"]');
-                                if (menuElement && menuElement instanceof HTMLElement) {
-                                    console.log("Found menu element after delay");
-                                    this.positionMenu(menuElement, replyButton);
-                                } else {
-                                    console.log("Menu element not found even after delay");
-                                }
-                            }, 50);
-                        }
-                    }, 0);
                     break;
                 }
                 currentElement = currentElement.parentElement;
@@ -1309,33 +1309,6 @@ class Threadloaf {
             floatButton.style.left = `${channelCenter}px`;
         }
     }
-
-    // Helper function to position the menu
-    private positionMenu = (menuElement: HTMLElement, replyButton: HTMLElement) => {
-        const buttonRect = replyButton.getBoundingClientRect();
-        console.log("Button rect:", buttonRect);
-
-        // Determine if we're in the bottom half of the viewport
-        const isBottomHalf = buttonRect.bottom > window.innerHeight / 2;
-
-        // Create a style element for our menu positioning
-        const styleId = "threadloaf-menu-position";
-        let styleEl = document.getElementById(styleId);
-        if (!styleEl) {
-            styleEl = document.createElement("style");
-            styleEl.id = styleId;
-            document.head.appendChild(styleEl);
-        }
-
-        // Update the style with the new position
-        styleEl.textContent = `
-            div[class*="menu_"] {
-                position: fixed !important;
-                ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`} !important;
-                right: ${window.innerWidth - buttonRect.right}px !important;
-            }
-        `;
-    };
 }
 
 // Initialize the Threadloaf class

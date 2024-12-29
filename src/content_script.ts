@@ -460,6 +460,10 @@ class Threadloaf {
     private renderThread(): void {
         if (!this.threadContainer) return;
 
+        // Store currently expanded message ID before re-render
+        const expandedMessage = document.querySelector(".threadloaf-message.expanded");
+        const expandedMessageId = expandedMessage?.getAttribute("data-msg-id");
+
         // Clean up any existing threadloaf containers first
         const existingContainer = document.getElementById("threadloaf-container");
         if (existingContainer) {
@@ -718,6 +722,19 @@ class Threadloaf {
             const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
                 existingContainer.remove();
+            }
+        }
+
+        // Restore expanded state if applicable
+        if (expandedMessageId) {
+            const messageToExpand = document.querySelector(`[data-msg-id="${expandedMessageId}"]`) as HTMLElement;
+            if (messageToExpand) {
+                messageToExpand.classList.add("expanded");
+                const previewContainer = messageToExpand.querySelector(".preview-container") as HTMLElement;
+                const fullContentContainer = messageToExpand.querySelector(".full-content") as HTMLElement;
+                if (previewContainer) previewContainer.style.display = "none";
+                if (fullContentContainer) fullContentContainer.style.display = "block";
+                messageToExpand.scrollIntoView({ behavior: "auto", block: "nearest" });
             }
         }
 
@@ -1117,20 +1134,37 @@ class Threadloaf {
     // Attach a MutationObserver to monitor DOM changes
     private setupMutationObserver(): void {
         this.observer = new MutationObserver((mutations) => {
-            // Check if any mutation added new messages
-            const hasNewMessages = mutations.some((mutation) =>
-                Array.from(mutation.addedNodes).some(
+            let shouldRerender = false;
+
+            for (const mutation of mutations) {
+                // Check for new messages
+                const hasNewMessages = Array.from(mutation.addedNodes).some(
                     (node) =>
                         node instanceof HTMLElement &&
                         (node.matches('li[id^="chat-messages-"]') || node.querySelector('li[id^="chat-messages-"]')),
-                ),
-            );
+                );
 
-            if (hasNewMessages) {
+                // Check for reactions changes
+                const hasReactionChanges =
+                    (mutation.target instanceof HTMLElement && mutation.target.matches('[class*="reactions_"]')) ||
+                    (mutation.target instanceof HTMLElement && mutation.target.closest('[class*="reactions_"]'));
+
+                // Check for message content edits
+                const hasMessageEdits =
+                    (mutation.target instanceof HTMLElement && mutation.target.matches('[id^="message-content-"]')) ||
+                    (mutation.target instanceof HTMLElement && mutation.target.closest('[id^="message-content-"]'));
+
+                if (hasNewMessages || hasReactionChanges || hasMessageEdits) {
+                    shouldRerender = true;
+                    break;
+                }
+            }
+
+            if (shouldRerender) {
                 // If we have a thread container already, just re-render
                 if (this.threadContainer) {
                     this.renderThread();
-                    // If we're in thread view, scroll to bottom
+                    // If we're in thread view, scroll to bottom only for new messages
                     if (this.isThreadViewActive) {
                         const threadContent = document.getElementById("threadloaf-content");
                         if (threadContent) {
@@ -1151,6 +1185,8 @@ class Threadloaf {
         this.observer.observe(this.appContainer!, {
             childList: true,
             subtree: true,
+            characterData: true, // Needed for text content changes
+            attributes: true, // Needed for reaction changes
         });
     }
 

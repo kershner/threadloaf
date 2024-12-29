@@ -105,7 +105,7 @@ div[class*="chat_"] {
 }
 
 .preview-container {
-    padding: 6px 12px;
+    padding: 2px 12px;
     display: inline-flex;
     align-items: center;
     gap: 8px;

@@ -336,6 +336,18 @@ class Threadloaf {
                     parent.children?.push(message);
                 } else {
                     // Create ghost message for missing parent
+                    /*
+                     * IMPORTANT: Discord messages are ALWAYS rich HTML content that must be rendered properly.
+                     * Never display raw HTML to users. The content and htmlContent fields contain Discord's
+                     * rich message HTML which includes formatted text, emojis, images, and other rich content.
+                     *
+                     * When creating a ghost message:
+                     * - content: Used for generating the preview text (will be parsed to extract plain text)
+                     * - htmlContent: Used for the expanded view (must be rendered as HTML)
+                     *
+                     * Both fields should contain the same HTML from the parent preview to ensure consistent
+                     * rendering in both preview and expanded states.
+                     */
                     const ghostMessage: MessageInfo = {
                         id: message.parentId,
                         author: message.parentPreview?.author || "Unknown",
@@ -718,7 +730,22 @@ class Threadloaf {
             // Get text and normalize whitespace
             contentPreview.textContent = temp.textContent?.replace(/\s+/g, " ").trim() || "";
         } else {
-            contentPreview.textContent = message.content;
+            /*
+             * IMPORTANT: Ghost message preview handling
+             *
+             * Ghost messages contain Discord's rich HTML content from the parent preview.
+             * We must parse this HTML properly to extract plain text for the preview.
+             *
+             * 1. Create a temporary container and set its HTML content
+             * 2. Extract and normalize the text content
+             * 3. Never display raw HTML in the preview
+             *
+             * This ensures consistent handling with regular messages while maintaining
+             * proper text extraction from HTML content.
+             */
+            const temp = document.createElement("div");
+            temp.innerHTML = message.content; // Parse the HTML safely
+            contentPreview.textContent = temp.textContent?.replace(/\s+/g, " ").trim() || "Message not loaded";
         }
 
         contentPreview.style.color = color;
@@ -886,9 +913,36 @@ class Threadloaf {
 
         // Add ghost notice if this is a ghost message
         if (message.isGhost) {
+            /*
+             * IMPORTANT: Ghost message expanded view handling
+             *
+             * Ghost messages must render their HTML content properly just like regular messages.
+             * The content comes from Discord's rich message preview and contains formatted text,
+             * emojis, images, and other rich content that must be rendered as HTML.
+             *
+             * 1. Create a ghost content wrapper for styling
+             * 2. Preserve and render the HTML content inside the wrapper
+             * 3. Never display raw HTML to the user
+             * 4. Add the "not loaded" notice below the rendered content
+             *
+             * This ensures ghost messages maintain Discord's rich formatting while being
+             * visually distinct from regular messages.
+             */
             const ghostNotice = document.createElement("div");
             ghostNotice.classList.add("ghost-notice");
             ghostNotice.textContent = "Full message not loaded";
+
+            // Create a ghost content wrapper
+            const ghostContent = document.createElement("div");
+            ghostContent.classList.add("ghost-content");
+
+            // Move the message content into the ghost content wrapper
+            // This preserves the HTML rendering while applying ghost styling
+            const existingContent = messageContent.innerHTML;
+            messageContent.innerHTML = "";
+            ghostContent.innerHTML = existingContent;
+
+            messageContent.appendChild(ghostContent);
             messageContent.appendChild(ghostNotice);
         }
 

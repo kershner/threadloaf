@@ -252,6 +252,7 @@ div[class*="chat_"] {
 .ghost-message {
     opacity: 0.5;
     border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
 }
 
 .ghost-message .message-content.preview {
@@ -263,14 +264,33 @@ div[class*="chat_"] {
     color: rgba(243, 231, 181, 0.5);
 }
 
+/* Enhanced ghost content styling */
 .ghost-content {
     position: relative;
-    padding-bottom: 24px;
+    padding: 8px;
+    margin-bottom: 24px; /* Space for the notice */
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+/* Ensure all HTML elements in ghost content render properly */
+.ghost-content img {
+    max-width: 100%;
+    height: auto;
+    opacity: 0.5;
+}
+
+.ghost-content a {
+    opacity: 0.7;
+}
+
+.ghost-content * {
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .ghost-notice {
     position: absolute;
-    bottom: 0;
+    bottom: -24px;
     left: 0;
     right: 0;
     text-align: center;

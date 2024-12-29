@@ -88,23 +88,31 @@ div[class*="chat_"] {
 }
 
 .threadloaf-message {
-    margin: 4px 0;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
+    margin: 0;
+    border-radius: 0;
     transition: all 0.2s ease;
     max-width: 100%;
 }
 
+.threadloaf-message.expanded {
+    background: rgba(255, 255, 255, 0.05);
+}
+
 .preview-container {
-    padding: 10px 12px;
+    padding: 6px 12px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     white-space: nowrap;
     overflow: hidden;
     width: 100%;
-    line-height: 1.4;
+    line-height: 1.3;
     box-sizing: border-box;
+    cursor: pointer;
+}
+
+.preview-container:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .pill-container {
@@ -112,24 +120,23 @@ div[class*="chat_"] {
 }
 
 .nav-arrow {
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(255, 255, 255, 0.1);
     border: none;
-    color: rgba(255, 255, 255, 0.9);
+    color: #ffffff;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 6px 12px;
     font-size: 0.9em;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease;
     border-radius: 4px;
 }
 
 .nav-arrow:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.9);
-    color: white;
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .nav-arrow:disabled {
     color: rgba(255, 255, 255, 0.3);
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(255, 255, 255, 0.05);
     cursor: not-allowed;
 }
 
@@ -161,17 +168,16 @@ div[class*="chat_"] {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
+    padding: 6px 12px;
     padding-left: 100px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
+    height: 28px;
 }
 
 .expanded-pill-container {
     position: absolute;
     left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -181,12 +187,16 @@ div[class*="chat_"] {
     color: #f3e7b5;
     font-weight: bold;
     font-size: 1.1em;
+    position: absolute;
+    left: 130px;
 }
 
 .expanded-header-right {
     display: flex;
     align-items: center;
     gap: 12px;
+    position: absolute;
+    right: 12px;
 }
 
 .expanded-timestamp {
@@ -212,9 +222,9 @@ div[class*="chat_"] {
 }
 
 .message-content-expanded {
-    padding: 16px 12px;
+    padding: 8px 12px;
     white-space: normal;
-    line-height: 1.4;
+    line-height: 1.3;
 }
 
 .message-content-expanded img {
@@ -274,12 +284,13 @@ div[class*="chat_"] {
 
 .embeds-container {
     padding: 0 12px;
-    margin-top: 16px;
+    margin-top: 8px;
+    line-height: 150%;
 }
 
 .reactions-container {
-    padding: 12px;
-    margin-top: 16px;
+    padding: 6px 12px;
+    margin-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;

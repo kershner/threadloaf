@@ -356,4 +356,23 @@ div[class*="chat_"] {
 .add-reaction-icon {
     font-size: 20px;
     line-height: 1;
+}
+
+/* Error message styling */
+.threadloaf-message[data-is-error="true"] {
+    border-left: 3px solid #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+}
+
+.threadloaf-message[data-is-error="true"] .message-author {
+    color: #ff4444;
+}
+
+.error-message {
+    color: #ff4444;
+    font-style: italic;
+    padding: 8px;
+    background: rgba(255, 68, 68, 0.05);
+    border-radius: 4px;
+    margin: 8px 0;
 } 

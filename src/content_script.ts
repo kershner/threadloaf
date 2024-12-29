@@ -776,9 +776,12 @@ class Threadloaf {
         const headerContainer = document.createElement("div");
         headerContainer.classList.add("expanded-header");
 
-        // Create navigation buttons for expanded view
-        const expandedPillContainer = document.createElement("div");
-        expandedPillContainer.classList.add("expanded-pill-container");
+        const expandedAuthor = document.createElement("span");
+        expandedAuthor.classList.add("expanded-author");
+        expandedAuthor.textContent = message.author;
+
+        const rightContainer = document.createElement("div");
+        rightContainer.classList.add("expanded-header-right");
 
         // Add navigation arrows
         const prevArrow = document.createElement("button");
@@ -796,39 +799,6 @@ class Threadloaf {
                 }))
                 .filter((m) => m.timestamp < currentTimestamp)
                 .sort((a, b) => b.timestamp - a.timestamp)[0]?.element;
-
-            if (targetMessage) {
-                // Collapse current message
-                el.classList.remove("expanded");
-                previewContainer.style.display = "flex";
-                fullContentContainer.style.display = "none";
-
-                // Expand target message
-                targetMessage.classList.add("expanded");
-                const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
-                const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
-                if (targetPreview) targetPreview.style.display = "none";
-                if (targetFull) targetFull.style.display = "block";
-
-                targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-        };
-
-        const nextArrow = document.createElement("button");
-        nextArrow.classList.add("nav-arrow", "next");
-        nextArrow.textContent = "→";
-        nextArrow.disabled = commentNumber === totalMessages;
-        nextArrow.onclick = (e) => {
-            e.stopPropagation();
-            // Find the message with the next highest timestamp
-            const currentTimestamp = message.timestamp;
-            const targetMessage = Array.from(document.querySelectorAll(".threadloaf-message"))
-                .map((el) => ({
-                    element: el as HTMLElement,
-                    timestamp: parseInt((el as HTMLElement).dataset.timestamp || "0"),
-                }))
-                .filter((m) => m.timestamp > currentTimestamp)
-                .sort((a, b) => a.timestamp - b.timestamp)[0]?.element;
 
             if (targetMessage) {
                 // Collapse current message
@@ -873,86 +843,40 @@ class Threadloaf {
             }
         };
 
-        expandedPillContainer.appendChild(prevArrow);
-        expandedPillContainer.appendChild(upArrow);
-        expandedPillContainer.appendChild(nextArrow);
+        const nextArrow = document.createElement("button");
+        nextArrow.classList.add("nav-arrow", "next");
+        nextArrow.textContent = "→";
+        nextArrow.disabled = commentNumber === totalMessages;
+        nextArrow.onclick = (e) => {
+            e.stopPropagation();
+            // Find the message with the next highest timestamp
+            const currentTimestamp = message.timestamp;
+            const targetMessage = Array.from(document.querySelectorAll(".threadloaf-message"))
+                .map((el) => ({
+                    element: el as HTMLElement,
+                    timestamp: parseInt((el as HTMLElement).dataset.timestamp || "0"),
+                }))
+                .filter((m) => m.timestamp > currentTimestamp)
+                .sort((a, b) => a.timestamp - b.timestamp)[0]?.element;
 
-        const expandedAuthor = document.createElement("span");
-        expandedAuthor.classList.add("expanded-author");
-        expandedAuthor.textContent = message.author;
+            if (targetMessage) {
+                // Collapse current message
+                el.classList.remove("expanded");
+                previewContainer.style.display = "flex";
+                fullContentContainer.style.display = "none";
 
-        const rightContainer = document.createElement("div");
-        rightContainer.classList.add("expanded-header-right");
+                // Expand target message
+                targetMessage.classList.add("expanded");
+                const targetPreview = targetMessage.querySelector(".preview-container") as HTMLElement;
+                const targetFull = targetMessage.querySelector(".full-content") as HTMLElement;
+                if (targetPreview) targetPreview.style.display = "none";
+                if (targetFull) targetFull.style.display = "block";
 
-        const timestamp = document.createElement("span");
-        timestamp.classList.add("expanded-timestamp");
-        timestamp.textContent = new Date(message.timestamp).toLocaleString();
+                targetMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        };
 
-        rightContainer.appendChild(timestamp);
-        headerContainer.appendChild(expandedAuthor);
-        headerContainer.insertBefore(expandedPillContainer, expandedAuthor);
-        headerContainer.appendChild(rightContainer);
-
-        const messageContent = document.createElement("div");
-        messageContent.classList.add("message-content-expanded");
-        messageContent.innerHTML = message.htmlContent;
-
-        fullContentContainer.appendChild(headerContainer);
-        fullContentContainer.appendChild(messageContent);
-
-        // Create a container for embeds if they exist
-        const embedsContainer = document.createElement("div");
-        embedsContainer.classList.add("embeds-container");
-
-        // Move embeds from messageContent to embedsContainer
-        const embedLinks = messageContent.querySelector(".embed-links");
-        if (embedLinks) {
-            messageContent.removeChild(embedLinks);
-            embedsContainer.appendChild(embedLinks);
-        }
-
-        // Add ghost notice if this is a ghost message
-        if (message.isGhost) {
-            /*
-             * IMPORTANT: Ghost message expanded view handling
-             *
-             * Ghost messages must render their HTML content properly just like regular messages.
-             * The content comes from Discord's rich message preview and contains formatted text,
-             * emojis, images, and other rich content that must be rendered as HTML.
-             *
-             * 1. Create a ghost content wrapper for styling
-             * 2. Preserve and render the HTML content inside the wrapper
-             * 3. Never display raw HTML to the user
-             * 4. Add the "not loaded" notice below the rendered content
-             *
-             * This ensures ghost messages maintain Discord's rich formatting while being
-             * visually distinct from regular messages.
-             */
-            const ghostNotice = document.createElement("div");
-            ghostNotice.classList.add("ghost-notice");
-            ghostNotice.textContent = "Full message not loaded";
-
-            // Create a ghost content wrapper
-            const ghostContent = document.createElement("div");
-            ghostContent.classList.add("ghost-content");
-
-            // Move the message content into the ghost content wrapper
-            // This preserves the HTML rendering while applying ghost styling
-            const existingContent = messageContent.innerHTML;
-            messageContent.innerHTML = "";
-            ghostContent.innerHTML = existingContent;
-
-            messageContent.appendChild(ghostContent);
-            messageContent.appendChild(ghostNotice);
-        }
-
-        fullContentContainer.appendChild(embedsContainer);
-
-        // Create reactions container (always present in expanded view)
-        const reactionsContainer = document.createElement("div");
-        reactionsContainer.classList.add("reactions-container");
-
-        // Create and add the Actions button first
+        // Create and add the Actions button
         const replyButton = document.createElement("button");
         replyButton.classList.add("reply-button");
         replyButton.textContent = "Actions";
@@ -985,12 +909,12 @@ class Threadloaf {
                 document.head.appendChild(styleEl);
             }
 
-            // Update the style with the new position, aligning menu's left with button's left
+            // Update the style with the new position, aligning menu's right with button's right
             styleEl.textContent = `
                 div[class*="menu_"]:not([class*="submenu_"]) {
                     position: fixed !important;
                     ${isBottomHalf ? "bottom" : "top"}: ${isBottomHalf ? `${window.innerHeight - buttonRect.top + 2}px` : `${buttonRect.bottom + 2}px`};
-                    left: ${buttonRect.left}px;
+                    right: ${window.innerWidth - buttonRect.right}px;
                 }
             `;
 
@@ -1015,7 +939,62 @@ class Threadloaf {
                 console.log("Moving to parent element:", currentElement);
             }
         };
-        reactionsContainer.appendChild(replyButton);
+
+        rightContainer.appendChild(prevArrow);
+        rightContainer.appendChild(upArrow);
+        rightContainer.appendChild(nextArrow);
+        rightContainer.appendChild(replyButton);
+
+        headerContainer.appendChild(expandedAuthor);
+        headerContainer.appendChild(rightContainer);
+
+        const messageContent = document.createElement("div");
+        messageContent.classList.add("message-content-expanded");
+        messageContent.innerHTML = message.htmlContent;
+
+        fullContentContainer.appendChild(headerContainer);
+        fullContentContainer.appendChild(messageContent);
+
+        // Create a container for embeds if they exist
+        const embedsContainer = document.createElement("div");
+        embedsContainer.classList.add("embeds-container");
+
+        // Move embeds from messageContent to embedsContainer
+        const embedLinks = messageContent.querySelector(".embed-links");
+        if (embedLinks) {
+            messageContent.removeChild(embedLinks);
+            embedsContainer.appendChild(embedLinks);
+        }
+
+        // Add ghost notice if this is a ghost message
+        if (message.isGhost) {
+            const ghostNotice = document.createElement("div");
+            ghostNotice.classList.add("ghost-notice");
+            ghostNotice.textContent = "Full message not loaded";
+
+            // Create a ghost content wrapper
+            const ghostContent = document.createElement("div");
+            ghostContent.classList.add("ghost-content");
+
+            // Move the message content into the ghost content wrapper
+            // This preserves the HTML rendering while applying ghost styling
+            const existingContent = messageContent.innerHTML;
+            messageContent.innerHTML = "";
+            ghostContent.innerHTML = existingContent;
+
+            messageContent.appendChild(ghostContent);
+            messageContent.appendChild(ghostNotice);
+        }
+
+        fullContentContainer.appendChild(embedsContainer);
+
+        // Create reactions container (always present in expanded view)
+        const reactionsContainer = document.createElement("div");
+        reactionsContainer.classList.add("reactions-container");
+
+        // Create a left container for reactions
+        const reactionsLeft = document.createElement("div");
+        reactionsLeft.classList.add("reactions-left");
 
         // Move existing reactions if present
         const reactionsClone = fullContentContainer.querySelector('[class*="reactions_"]');
@@ -1025,8 +1004,16 @@ class Threadloaf {
             const existingReactions = document.createElement("div");
             existingReactions.classList.add("existing-reactions");
             existingReactions.appendChild(reactionsClone);
-            reactionsContainer.appendChild(existingReactions);
+            reactionsLeft.appendChild(existingReactions);
         }
+
+        // Create timestamp for the right side
+        const timestamp = document.createElement("span");
+        timestamp.classList.add("expanded-timestamp");
+        timestamp.textContent = new Date(message.timestamp).toLocaleString();
+
+        reactionsContainer.appendChild(reactionsLeft);
+        reactionsContainer.appendChild(timestamp);
 
         fullContentContainer.appendChild(reactionsContainer);
 

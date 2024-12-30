@@ -444,8 +444,8 @@ class ThreadRenderer {
                     if (previewContainer) previewContainer.style.display = "none";
                     if (fullContent) fullContent.style.display = "block";
 
-                    // 4. Scroll to show it
-                    newestMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+                    // 4. Scroll to show it (without animation)
+                    newestMessage.scrollIntoView({ behavior: "auto", block: "center" });
                 }
             } else {
                 // In Chat mode: scroll the original chat container to bottom

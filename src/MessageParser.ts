@@ -57,18 +57,58 @@ class MessageParser {
 
                     // If not a system message, proceed with regular message parsing
                     const headerEl = contentsEl.querySelector('[class^="header_"]');
-                    if (!headerEl) {
-                        throw new Error("Failed to find header element");
+                    let author: string | undefined;
+                    let timestampEl: Element | null = null;
+
+                    if (headerEl) {
+                        // Standard compact mode parsing
+                        author = headerEl
+                            .querySelector('[id^="message-username-"] > span[class^="username_"]')
+                            ?.textContent?.trim();
+                        timestampEl = headerEl.querySelector("time");
+                    } else {
+                        // Cozy mode parsing - username is in a different location
+                        const messageWrapper = contentsEl.closest('[class*="cozyMessage_"]');
+                        if (messageWrapper) {
+                            // First try to find username element directly
+                            const usernameEl = messageWrapper.querySelector('[class*="username_"]');
+                            if (usernameEl) {
+                                author = usernameEl.textContent?.trim();
+                            } else {
+                                // For continuation messages, get username from aria-labelledby
+                                const labelledBy = messageWrapper.getAttribute("aria-labelledby");
+                                if (labelledBy) {
+                                    // Find the username element ID in the aria-labelledby attribute
+                                    const usernameId = labelledBy
+                                        .split(" ")
+                                        .find((id) => id.startsWith("message-username-"));
+                                    if (usernameId) {
+                                        // Look up the username element in the thread container
+                                        const threadContainer = this.state.threadContainer;
+                                        if (threadContainer) {
+                                            const referenceUsernameEl = threadContainer.querySelector(
+                                                `#${usernameId} [class*="username_"]`,
+                                            );
+                                            author = referenceUsernameEl?.textContent?.trim();
+                                        }
+                                    }
+                                }
+                            }
+                            timestampEl = contentsEl.querySelector("time");
+                        }
                     }
 
-                    const author = headerEl
-                        .querySelector('[id^="message-username-"] > span[class^="username_"]')
-                        ?.textContent?.trim();
                     if (!author) {
+                        console.error("Failed to find author element. DOM structure:", {
+                            messageId: id,
+                            contentsHtml: contentsEl.outerHTML,
+                            wrapperHtml: contentsEl.closest('[class*="cozyMessage_"]')?.outerHTML,
+                            labelledBy: contentsEl.closest('[class*="cozyMessage_"]')?.getAttribute("aria-labelledby"),
+                            threadHtml: this.state.threadContainer?.innerHTML,
+                        });
                         throw new Error("Failed to find author element");
                     }
 
-                    const timestampEl = headerEl.querySelector("time");
                     if (!timestampEl) {
                         throw new Error("Failed to find timestamp element");
                     }

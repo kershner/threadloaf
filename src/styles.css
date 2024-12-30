@@ -372,3 +372,11 @@ div[class*="chat_"] {
     cursor: not-allowed;
     border: 3px solid var(--background-secondary);
 }
+
+/* Mentions aren't clickable in our thread view, so don't make it seem like they are.
+   Don't affect mentions in chat view. */
+div#threadloaf-container span.mention, div#threadloaf-container span.mention:hover {
+    cursor: default;
+    background: inherit;
+    color: inherit;
+}

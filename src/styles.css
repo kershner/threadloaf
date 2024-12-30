@@ -1,8 +1,7 @@
 #threadloaf-container {
     padding: 0;
     font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background: #000000;
-    color: #ffffff;
+    color: var(--text-normal);
     position: absolute;
     top: 0;
     left: 0;
@@ -31,15 +30,8 @@
 }
 
 .toggle-container {
-    border-radius: 20px;
-    background: rgb(32, 34, 37);
-    border: 3px solid rgb(88, 101, 242);
     display: flex;
     overflow: hidden;
-}
-
-.toggle-container:hover {
-    border-color: rgb(88, 101, 242);
 }
 
 .toggle-option {
@@ -47,18 +39,13 @@
     width: 75px;
     background: transparent;
     border: none;
-    color: rgb(128, 128, 128);
+    color: var(--text-normal);
     cursor: pointer;
 }
 
 .toggle-option.active {
-    background: rgb(88, 101, 242);
-    color: white;
-}
-
-.toggle-option:hover:not(.active) {
-    color: rgb(255, 255, 255);
-    background: rgb(88, 101, 242);
+    background: var(--text-normal);
+    color: var(--background-primary);
 }
 
 /* Thread content styles */
@@ -121,7 +108,7 @@ div[class*="chat_"] {
 .nav-arrow {
     background: rgba(255, 255, 255, 0.1);
     border: none;
-    color: #ffffff;
+    color: var(--text-normal);
     cursor: pointer;
     padding: 4px 10px;
     font-size: 0.9em;
@@ -151,13 +138,13 @@ div[class*="chat_"] {
 }
 
 .message-author {
-    color: #f3e7b5;
+    color: var(--mention-foreground);
     flex: 0 0 auto;
     padding-right: 12px;
 }
 
 .separator {
-    color: #ffffff;
+    color: var(--text-normal);
     flex: 0 0 auto;
     margin: 0 4px;
 }
@@ -167,9 +154,10 @@ div[class*="chat_"] {
     justify-content: space-between;
     align-items: center;
     padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in oklab, var(--text-normal) 20%, var(--background-primary) 80%);
     position: relative;
     height: 28px;
+    line-height: 100%;
 }
 
 .expanded-pill-container {
@@ -181,8 +169,7 @@ div[class*="chat_"] {
 }
 
 .expanded-author {
-    color: #f3e7b5;
-    font-weight: bold;
+    color: var(--mention-foreground);
     font-size: 1.1em;
 }
 
@@ -193,7 +180,8 @@ div[class*="chat_"] {
 }
 
 .expanded-timestamp {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-normal);
+    opacity: 0.8;
     font-size: 0.9em;
     margin-left: auto;
 }
@@ -201,7 +189,7 @@ div[class*="chat_"] {
 .reply-button {
     background: rgba(255, 255, 255, 0.1);
     border: none;
-    color: #ffffff;
+    color: var(--text-normal);
     padding: 4px 10px;
     border-radius: 4px;
     cursor: pointer;
@@ -292,6 +280,7 @@ div[class*="chat_"] {
     align-items: center;
     justify-content: space-between;
     height: 28px;
+    line-height: 100%;
 }
 
 .reactions-left {
@@ -328,7 +317,6 @@ div[class*="chat_"] {
     background: none !important;
     filter: none !important;
     border: none !important;
-    color: rgba(255, 255, 255, 0.5) !important;
 }
 
 .existing-reactions [class*="reaction_"]:active {
@@ -337,7 +325,6 @@ div[class*="chat_"] {
 
 /* Ensure reaction count matches non-interactive state */
 .existing-reactions [class*="reaction_"] [class*="reactionCount_"] {
-    color: rgba(255, 255, 255, 0.5) !important;
     margin-left: 4px !important;
 }
 
@@ -360,56 +347,28 @@ div[class*="chat_"] {
     margin: 8px 0;
 }
 
-.load-up-button {
+.toggle-container, .load-up-button, .newest-button {
+    background: var(--background-secondary);
+    border: 3px solid var(--border-faint);
+    border-radius: 20px;
+}
+
+.load-up-button, .newest-button {
     padding: 8px 12px;
     width: 100px;
-    background: rgb(32, 34, 37);
-    border: 3px solid rgb(88, 101, 242);
-    border-radius: 20px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-normal);
     cursor: pointer;
     visibility: visible;
     opacity: 1;
 }
 
-.load-up-button[style*="display: none"] {
-    visibility: hidden;
-    opacity: 0;
-    display: block !important;
+.toggle-container:hover, .load-up-button:hover:not(:disabled), .newest-button:hover:not(:disabled) {
+    color: var(--text-normal);
+    border-color: var(--border-strong);
 }
 
-.load-up-button:hover:not(:disabled) {
-    color: rgb(255, 255, 255, 0.8);
-    background: rgb(88, 101, 242);
-    border-color: rgba(88, 101, 242, 0.5);
-}
-
-.load-up-button:disabled {
-    color: rgba(255, 255, 255, 0.3);
-    background: rgb(32, 34, 37);
+.load-up-button:disabled, .newest-button:disabled {
+    color: var(--text-muted);
     cursor: not-allowed;
+    border: 3px solid var(--background-secondary);
 }
-
-.newest-button {
-    padding: 8px 12px;
-    width: 100px;
-    background: rgb(32, 34, 37);
-    border: 3px solid rgb(88, 101, 242);
-    border-radius: 20px;
-    color: rgba(255, 255, 255, 0.5);
-    cursor: pointer;
-    visibility: visible;
-    opacity: 1;
-}
-
-.newest-button:hover:not(:disabled) {
-    color: rgba(255, 255, 255, 0.8);
-    background: rgb(88, 101, 242);
-    border-color: rgba(88, 101, 242, 0.5);
-}
-
-.newest-button:disabled {
-    color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.05);
-    cursor: not-allowed;
-} 

@@ -201,25 +201,25 @@ class ThreadRenderer {
         const messageColors = new Map<string, string>();
         const messageBold = new Map<string, boolean>();
 
-        // Set colors for the newest 15 messages
-        const baseGray = 128; // Medium gray
         const numGradientMessages = Math.min(15, colorSortedMessages.length);
 
         colorSortedMessages.forEach((msg, index) => {
+            let color;
             if (index === 0) {
-                // Newest message gets white and bold
-                messageColors.set(msg.id, "rgb(255, 255, 255)");
+                // Newest message gets text-normal color and bold
+                color = "var(--text-normal)";
+                messageColors.set(msg.id, color);
                 messageBold.set(msg.id, true);
             } else if (index < numGradientMessages) {
-                // Next 14 messages get gradient from just above medium gray to near-white
-                const colorValue = Math.floor(
-                    baseGray + ((255 - baseGray) * (numGradientMessages - index)) / numGradientMessages,
-                );
-                messageColors.set(msg.id, `rgb(${colorValue}, ${colorValue}, ${colorValue})`);
+                // Next messages get a gradient blend between text-normal and background-primary
+                const ratio = Math.min(50, Math.round((index / numGradientMessages) * 100));
+                color = `color-mix(in oklab, var(--text-normal), var(--background-primary) ${ratio}%)`;
+                messageColors.set(msg.id, color);
                 messageBold.set(msg.id, false);
             } else {
-                // Older messages get medium gray
-                messageColors.set(msg.id, `rgb(${baseGray}, ${baseGray}, ${baseGray})`);
+                // Older messages get 50% blend
+                color = "color-mix(in oklab, var(--text-normal), var(--background-primary) 50%)";
+                messageColors.set(msg.id, color);
                 messageBold.set(msg.id, false);
             }
         });

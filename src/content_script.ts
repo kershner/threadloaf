@@ -42,7 +42,7 @@ class Threadloaf {
         }
         this.domMutator.injectStyles();
         this.setupHeaderObserver();
-        this.setupMutationObserver();
+        this.domParser.setupMutationObserver(() => this.renderThread());
         this.setupPolling();
         this.setupKeyboardNavigation();
 
@@ -450,60 +450,6 @@ class Threadloaf {
 
         // Try to hide header again after rendering
         this.findAndHideHeader();
-    }
-
-    // Attach a MutationObserver to monitor DOM changes
-    private setupMutationObserver(): void {
-        this.state.observer = new MutationObserver((mutations) => {
-            let shouldRerender = false;
-
-            for (const mutation of mutations) {
-                // Check for new messages
-                const hasNewMessages = Array.from(mutation.addedNodes).some(
-                    (node) =>
-                        node instanceof HTMLElement &&
-                        (node.matches('li[id^="chat-messages-"]') || node.querySelector('li[id^="chat-messages-"]')),
-                );
-
-                // Check for reactions changes
-                const hasReactionChanges =
-                    (mutation.target instanceof HTMLElement && mutation.target.matches('[class*="reactions_"]')) ||
-                    (mutation.target instanceof HTMLElement && mutation.target.closest('[class*="reactions_"]'));
-
-                // Check for message content edits
-                const hasMessageEdits =
-                    (mutation.target instanceof HTMLElement && mutation.target.matches('[id^="message-content-"]')) ||
-                    (mutation.target instanceof HTMLElement && mutation.target.closest('[id^="message-content-"]'));
-
-                if (hasNewMessages || hasReactionChanges || hasMessageEdits) {
-                    shouldRerender = true;
-                    break;
-                }
-            }
-
-            if (shouldRerender) {
-                const newThreadContainer = this.domParser.findThreadContainer();
-                if (newThreadContainer) {
-                    this.state.threadContainer = newThreadContainer;
-                    this.renderThread();
-
-                    // Only scroll to bottom if we're in thread view AND we're not loading more messages
-                    if (this.state.isThreadViewActive && !this.state.isLoadingMore) {
-                        const threadContent = document.getElementById("threadloaf-content");
-                        if (threadContent) {
-                            threadContent.scrollTop = threadContent.scrollHeight;
-                        }
-                    }
-                }
-            }
-        });
-
-        this.state.observer.observe(this.state.appContainer!, {
-            childList: true,
-            subtree: true,
-            characterData: true, // Needed for text content changes
-            attributes: true, // Needed for reaction changes
-        });
     }
 
     // Fallback: Polling to handle delayed loading or missed events

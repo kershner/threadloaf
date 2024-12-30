@@ -406,4 +406,13 @@ class DomMutator {
 
         return el;
     }
+
+    // Inject CSS styles for the thread UI
+    public injectStyles(): void {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.type = "text/css";
+        link.href = chrome.runtime.getURL("styles.css");
+        document.head.appendChild(link);
+    }
 }

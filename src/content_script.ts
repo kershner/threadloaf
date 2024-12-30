@@ -40,7 +40,7 @@ class Threadloaf {
             console.error("Threadloaf: Failed to find app container. Aborting initialization.");
             return;
         }
-        this.injectStyles();
+        this.domMutator.injectStyles();
         this.setupHeaderObserver();
         this.setupMutationObserver();
         this.setupPolling();
@@ -524,15 +524,6 @@ class Threadloaf {
                 clearInterval(interval);
             }
         }, 1000);
-    }
-
-    // Inject CSS styles for the thread UI
-    private injectStyles(): void {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.type = "text/css";
-        link.href = chrome.runtime.getURL("styles.css");
-        document.head.appendChild(link);
     }
 
     private setupHeaderObserver(): void {

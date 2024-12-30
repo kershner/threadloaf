@@ -62,7 +62,7 @@ class ThreadRenderer {
 
             // Create Load Up button as a separate element
             const loadUpButton = this.createLoadUpButton();
-            loadUpButton.style.marginLeft = "8px"; // Change margin to left side
+            loadUpButton.style.marginRight = "8px"; // Change margin to right side
 
             // Create toggle container
             const toggleContainer = document.createElement("div");
@@ -138,8 +138,8 @@ class ThreadRenderer {
             // Append buttons in the right order
             toggleContainer.appendChild(chatOption);
             toggleContainer.appendChild(threadOption);
+            floatButton.appendChild(loadUpButton); // Move load button to start
             floatButton.appendChild(toggleContainer);
-            floatButton.appendChild(loadUpButton); // Move load button to end
             document.body.appendChild(floatButton);
 
             // Position the button initially
@@ -338,7 +338,7 @@ class ThreadRenderer {
     private createLoadUpButton(): HTMLButtonElement {
         const loadUpButton = document.createElement("button");
         loadUpButton.className = "load-up-button";
-        loadUpButton.textContent = "Load More";
+        loadUpButton.textContent = "Older";
         loadUpButton.title = "Load earlier messages";
         loadUpButton.style.opacity = this.state.isTopLoaded ? "0" : "1";
         loadUpButton.style.visibility = this.state.isTopLoaded ? "hidden" : "visible";
@@ -427,8 +427,8 @@ class ThreadRenderer {
                 const loadButtonWidth = loadButton ? loadButton.offsetWidth : 0;
                 const spacing = 8; // Space between buttons
 
-                // Calculate position that centers the toggle and puts load button to the right
-                const adjustedCenter = channelCenter + (loadButton ? (loadButtonWidth + spacing) / 2 : 0);
+                // Calculate position that centers the toggle and puts load button to the left
+                const adjustedCenter = channelCenter - (loadButton ? (loadButtonWidth + spacing) / 2 : 0);
 
                 floatButton.style.left = `${adjustedCenter}px`;
             } else {

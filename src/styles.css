@@ -24,7 +24,6 @@
     color: white;
     font-size: 15px;
     cursor: pointer;
-    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     transform: translate(-50%, 0);
@@ -33,19 +32,18 @@
 .toggle-container {
     border-radius: 20px;
     background: rgb(32, 34, 37);
-    border: 3px solid rgba(88, 101, 242, 0.3);
+    border: 3px solid rgb(88, 101, 242);
     display: flex;
     overflow: hidden;
 }
 
 .toggle-container:hover {
-    border-color: rgba(88, 101, 242, 0.5);
+    border-color: rgb(88, 101, 242);
 }
 
 .toggle-option {
     padding: 8px 0;
     width: 75px;
-    transition: all 0.2s ease;
     background: transparent;
     border: none;
     color: rgba(255, 255, 255, 0.5);
@@ -53,7 +51,7 @@
 }
 
 .toggle-option.active {
-    background: rgba(88, 101, 242, 0.9);
+    background: rgb(88, 101, 242);
     color: white;
 }
 
@@ -227,16 +225,6 @@ div[class*="chat_"] {
     display: none;
 }
 
-.threadloaf-message.highlighted {
-    background: rgba(255, 255, 255, 0.15);
-    transition: background 0.2s ease;
-}
-
-.threadloaf-message.fade-out {
-    background: rgba(255, 255, 255, 0.05);
-    transition: background 0.3s ease;
-}
-
 .ghost-message {
     opacity: 0.5;
     border: 1px dashed rgba(255, 255, 255, 0.2);
@@ -374,15 +362,13 @@ div[class*="chat_"] {
 .load-up-button {
     padding: 8px 12px;
     width: 100px;
-    transition: all 0.2s ease;
     background: rgb(32, 34, 37);
-    border: 3px solid rgba(88, 101, 242, 0.3);
+    border: 3px solid rgb(88, 101, 242);
     border-radius: 20px;
     color: rgba(255, 255, 255, 0.5);
     cursor: pointer;
     visibility: visible;
     opacity: 1;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .load-up-button[style*="display: none"] {

@@ -64,6 +64,10 @@ class ThreadRenderer {
             const loadUpButton = this.createLoadUpButton();
             loadUpButton.style.marginRight = "8px"; // Change margin to right side
 
+            // Create Newest button
+            const newestButton = this.createNewestButton();
+            newestButton.style.marginLeft = "8px";
+
             // Create toggle container
             const toggleContainer = document.createElement("div");
             toggleContainer.className = "toggle-container";
@@ -140,6 +144,7 @@ class ThreadRenderer {
             toggleContainer.appendChild(threadOption);
             floatButton.appendChild(loadUpButton); // Move load button to start
             floatButton.appendChild(toggleContainer);
+            floatButton.appendChild(newestButton); // Add newest button at the end
             document.body.appendChild(floatButton);
 
             // Position the button initially
@@ -340,8 +345,7 @@ class ThreadRenderer {
         loadUpButton.className = "load-up-button";
         loadUpButton.textContent = "Older";
         loadUpButton.title = "Load earlier messages";
-        loadUpButton.style.opacity = this.state.isTopLoaded ? "0" : "1";
-        loadUpButton.style.visibility = this.state.isTopLoaded ? "hidden" : "visible";
+        loadUpButton.disabled = this.state.isTopLoaded;
 
         let isLoading = false;
         loadUpButton.onclick = async () => {
@@ -352,7 +356,7 @@ class ThreadRenderer {
 
             isLoading = true;
             this.state.isLoadingMore = true; // Set flag before loading
-            loadUpButton.disabled = true;
+            loadUpButton.disabled = this.state.isTopLoaded;
 
             // If we're in thread view, temporarily switch to chat view
             const wasInThreadView = this.state.isThreadViewActive;
@@ -399,16 +403,62 @@ class ThreadRenderer {
             setTimeout(() => {
                 isLoading = false;
                 this.state.isLoadingMore = false;
-                loadUpButton.disabled = false;
-
-                // Check if we're at the top after loading
-                this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
-                loadUpButton.style.opacity = this.state.isTopLoaded ? "0" : "1";
-                loadUpButton.style.visibility = this.state.isTopLoaded ? "hidden" : "visible";
+                loadUpButton.disabled = this.state.isTopLoaded || false;
             }, 1000);
         };
 
         return loadUpButton;
+    }
+
+    private createNewestButton(): HTMLButtonElement {
+        const newestButton = document.createElement("button");
+        newestButton.className = "newest-button";
+        newestButton.textContent = "Newest";
+        newestButton.title = "Jump to newest message";
+
+        newestButton.onclick = () => {
+            if (this.state.isThreadViewActive) {
+                // In Thread mode:
+                // 1. Collapse any expanded message
+                const expandedMessage = document.querySelector(".threadloaf-message.expanded");
+                if (expandedMessage) {
+                    expandedMessage.classList.remove("expanded");
+                    const previewContainer = expandedMessage.querySelector(".preview-container") as HTMLElement;
+                    const fullContent = expandedMessage.querySelector(".full-content") as HTMLElement;
+                    if (previewContainer) previewContainer.style.display = "flex";
+                    if (fullContent) fullContent.style.display = "none";
+                }
+
+                // 2. Find the most recent message (it's in bold)
+                const messages = Array.from(document.querySelectorAll(".threadloaf-message"));
+                const newestMessage = messages.find((msg) => {
+                    const preview = msg.querySelector(".message-content.preview") as HTMLElement;
+                    return preview && preview.style.fontWeight === "bold";
+                });
+
+                if (newestMessage) {
+                    // 3. Expand the newest message
+                    newestMessage.classList.add("expanded");
+                    const previewContainer = newestMessage.querySelector(".preview-container") as HTMLElement;
+                    const fullContent = newestMessage.querySelector(".full-content") as HTMLElement;
+                    if (previewContainer) previewContainer.style.display = "none";
+                    if (fullContent) fullContent.style.display = "block";
+
+                    // 4. Scroll to show it
+                    newestMessage.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            } else {
+                // In Chat mode: scroll the original chat container to bottom
+                if (this.state.threadContainer) {
+                    const scrollerElement = this.state.threadContainer.closest('div[class*="scroller_"]');
+                    if (scrollerElement) {
+                        scrollerElement.scrollTop = scrollerElement.scrollHeight;
+                    }
+                }
+            }
+        };
+
+        return newestButton;
     }
 
     private updateFloatButtonPosition(): void {

@@ -29,6 +29,10 @@ class ThreadRenderer {
     public renderThread(): void {
         if (!this.state.threadContainer) return;
 
+        // Store scroll position before re-render
+        const existingThreadContent = document.getElementById("threadloaf-content");
+        const scrollTop = existingThreadContent?.scrollTop || 0;
+
         // Check if we're at the top of the thread
         this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
 
@@ -304,15 +308,38 @@ class ThreadRenderer {
                 parentElement.style.position = "relative";
                 parentElement.appendChild(threadloafContainer);
 
-                // Expand the first post when entering thread view
-                const firstMessage = document.querySelector(".threadloaf-message") as HTMLElement;
-                if (firstMessage) {
-                    firstMessage.classList.add("expanded");
-                    const previewContainer = firstMessage.querySelector(".preview-container") as HTMLElement;
-                    const fullContentContainer = firstMessage.querySelector(".full-content") as HTMLElement;
-                    if (previewContainer) previewContainer.style.display = "none";
-                    if (fullContentContainer) fullContentContainer.style.display = "block";
+                // First, handle expanded posts
+                if (expandedMessageId) {
+                    // Restore previously expanded message
+                    const messageToExpand = document.querySelector(
+                        `[data-msg-id="${expandedMessageId}"]`,
+                    ) as HTMLElement;
+                    if (messageToExpand) {
+                        messageToExpand.classList.add("expanded");
+                        const previewContainer = messageToExpand.querySelector(".preview-container") as HTMLElement;
+                        const fullContentContainer = messageToExpand.querySelector(".full-content") as HTMLElement;
+                        if (previewContainer) previewContainer.style.display = "none";
+                        if (fullContentContainer) fullContentContainer.style.display = "block";
+                    }
+                } else if (!existingThreadContent) {
+                    // Only expand first post if this is the initial render (no existing content)
+                    const firstMessage = document.querySelector(".threadloaf-message") as HTMLElement;
+                    if (firstMessage) {
+                        firstMessage.classList.add("expanded");
+                        const previewContainer = firstMessage.querySelector(".preview-container") as HTMLElement;
+                        const fullContentContainer = firstMessage.querySelector(".full-content") as HTMLElement;
+                        if (previewContainer) previewContainer.style.display = "none";
+                        if (fullContentContainer) fullContentContainer.style.display = "block";
+                    }
                 }
+
+                // Then restore scroll position with zero timeout
+                setTimeout(() => {
+                    const newThreadContent = document.getElementById("threadloaf-content");
+                    if (newThreadContent) {
+                        newThreadContent.scrollTop = scrollTop;
+                    }
+                }, 0);
             }
         } else {
             this.state.threadContainer.style.display = "block";
@@ -320,19 +347,6 @@ class ThreadRenderer {
             const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
                 existingContainer.remove();
-            }
-        }
-
-        // Restore expanded state if applicable
-        if (expandedMessageId) {
-            const messageToExpand = document.querySelector(`[data-msg-id="${expandedMessageId}"]`) as HTMLElement;
-            if (messageToExpand) {
-                messageToExpand.classList.add("expanded");
-                const previewContainer = messageToExpand.querySelector(".preview-container") as HTMLElement;
-                const fullContentContainer = messageToExpand.querySelector(".full-content") as HTMLElement;
-                if (previewContainer) previewContainer.style.display = "none";
-                if (fullContentContainer) fullContentContainer.style.display = "block";
-                messageToExpand.scrollIntoView({ behavior: "auto", block: "nearest" });
             }
         }
 

@@ -1,6 +1,12 @@
 /// <reference path="./DomMutator.ts" />
 /// <reference path="./ThreadloafState.ts" />
 
+/**
+ * Handles DOM traversal and element discovery in Discord's interface.
+ * Responsible for finding key UI elements, setting up mutation observers
+ * to track DOM changes, and providing methods to locate message containers
+ * and other important Discord UI components.
+ */
 class DomParser {
     private domMutator: DomMutator;
     private state: ThreadloafState;

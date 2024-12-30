@@ -1,3 +1,9 @@
+/**
+ * Manages the rendering of threaded message views in the Discord interface.
+ * Responsible for creating and updating the thread UI, handling message
+ * expansion/collapse, managing the load more button, and coordinating
+ * between the message tree structure and DOM representation.
+ */
 class ThreadRenderer {
     private state: ThreadloafState;
     private domParser: DomParser;

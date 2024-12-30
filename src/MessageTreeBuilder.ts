@@ -1,5 +1,11 @@
 /// <reference path="./MessageInfo.ts" />
 
+/**
+ * Constructs hierarchical message trees from flat message lists.
+ * Responsible for analyzing message relationships (replies, parents),
+ * building a tree structure that represents message threading,
+ * and handling missing messages in the conversation chain.
+ */
 class MessageTreeBuilder {
     // Build a hierarchical message tree
     public buildMessageTree(messages: MessageInfo[]): MessageInfo[] {

@@ -21,6 +21,13 @@
  *   document.querySelector('[id^="message-content-"]')  // Correct
  */
 
+/**
+ * Main entry point and controller for the Threadloaf extension.
+ * Coordinates between different components to initialize the extension,
+ * set up observers and event handlers, and manage the overall flow
+ * of the application. Handles setup of keyboard navigation and polling
+ * for Discord's dynamic content loading.
+ */
 class Threadloaf {
     private state: ThreadloafState;
     private messageParser: MessageParser;

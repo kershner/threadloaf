@@ -1,3 +1,9 @@
+/**
+ * Handles DOM manipulation and UI element creation for the Threadloaf interface.
+ * Responsible for creating message elements, managing styles, hiding Discord's
+ * native thread header, and handling all direct modifications to the DOM.
+ * Includes utilities for creating and styling message previews and expanded views.
+ */
 class DomMutator {
     private state: ThreadloafState;
 

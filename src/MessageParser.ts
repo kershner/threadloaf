@@ -1,3 +1,9 @@
+/**
+ * Parses Discord message elements into structured MessageInfo objects.
+ * Responsible for extracting message content, metadata, and relationships
+ * from Discord's DOM structure, handling both regular and system messages.
+ * Includes special handling for embeds, reactions, and reply contexts.
+ */
 class MessageParser {
     private state: ThreadloafState;
 

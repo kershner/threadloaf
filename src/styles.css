@@ -19,6 +19,7 @@
 #threadloaf-float-button {
     position: fixed;
     top: 56px;
+    left: 50%;
     z-index: 999;
     padding: 0;
     color: white;

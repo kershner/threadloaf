@@ -468,22 +468,7 @@ class ThreadRenderer {
         if (floatButton && channelContainer) {
             const channelRect = channelContainer.getBoundingClientRect();
             const channelCenter = channelRect.left + channelRect.width / 2;
-
-            // Position the container so the toggle is centered
-            const toggleContainer = floatButton.querySelector(".toggle-container") as HTMLElement;
-            if (toggleContainer) {
-                const toggleWidth = toggleContainer.offsetWidth;
-                const loadButton = floatButton.querySelector(".load-up-button") as HTMLElement;
-                const loadButtonWidth = loadButton ? loadButton.offsetWidth : 0;
-                const spacing = 8; // Space between buttons
-
-                // Calculate position that centers the toggle and puts load button to the left
-                const adjustedCenter = channelCenter - (loadButton ? (loadButtonWidth + spacing) / 2 : 0);
-
-                floatButton.style.left = `${adjustedCenter}px`;
-            } else {
-                floatButton.style.left = `${channelCenter}px`;
-            }
+            floatButton.style.left = `${channelCenter}px`;
         }
     }
 }

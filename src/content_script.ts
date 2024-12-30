@@ -1,4 +1,5 @@
 /// <reference path="./MessageInfo.ts" />
+/// <reference path="./ThreadloafState.ts" />
 
 /*
  * IMPORTANT: Discord Class/ID Naming Pattern
@@ -17,22 +18,17 @@
  */
 
 class Threadloaf {
-    private appContainer: HTMLElement | null = null;
-    private threadContainer: HTMLElement | null = null;
-    private observer: MutationObserver | null = null;
-    private headerObserver: MutationObserver | null = null;
-    private isThreadViewActive: boolean = false; // Changed from true to false to start in chat view
-    private isTopLoaded: boolean = false;
-    private isLoadingMore: boolean = false; // Add flag to track load more state
+    private state: ThreadloafState;
 
-    constructor() {
+    constructor(state: ThreadloafState) {
+        this.state = state;
         this.initialize();
     }
 
     // Entry point for initialization
     private initialize(): void {
-        this.appContainer = this.findAppContainer();
-        if (!this.appContainer) {
+        this.state.appContainer = this.findAppContainer();
+        if (!this.state.appContainer) {
             console.error("Threadloaf: Failed to find app container. Aborting initialization.");
             return;
         }
@@ -45,9 +41,9 @@ class Threadloaf {
         // Find initial thread container and set up initial view
         const initialThreadContainer = this.findThreadContainer();
         if (initialThreadContainer) {
-            this.threadContainer = initialThreadContainer;
+            this.state.threadContainer = initialThreadContainer;
             // Show the chat view and create float button
-            this.threadContainer.style.display = "block";
+            this.state.threadContainer.style.display = "block";
             this.renderThread(); // This will create the button in chat view mode
         }
     }
@@ -65,7 +61,7 @@ class Threadloaf {
                 return el.getAttribute("data-list-id") === "chat-messages" && el.children.length > 0;
             }) || null;
 
-        if (threadContainer && this.isThreadViewActive) {
+        if (threadContainer && this.state.isThreadViewActive) {
             // Only apply scroll override in thread view
             // Find and disable scrolling on the original scroller
             const scrollerElement = threadContainer.closest('div[class*="scroller_"]');
@@ -111,268 +107,270 @@ class Threadloaf {
 
     // Parse all messages in the thread container
     private parseMessages(): MessageInfo[] {
-        if (!this.threadContainer) return [];
+        if (!this.state.threadContainer) return [];
 
-        const messages = Array.from(this.threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map((el) => {
-            try {
-                const id = el.id.split("-").pop() || "";
+        const messages = Array.from(this.state.threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map(
+            (el) => {
+                try {
+                    const id = el.id.split("-").pop() || "";
 
-                const contentsEl = el.querySelector('[class^="contents_"]');
-                if (!contentsEl) {
-                    throw new Error("Failed to find contents element");
-                }
+                    const contentsEl = el.querySelector('[class^="contents_"]');
+                    if (!contentsEl) {
+                        throw new Error("Failed to find contents element");
+                    }
 
-                // Try to parse as a system message first
-                const systemContainer = contentsEl.querySelector('[class*="container_"][class*="compact_"]');
-                if (systemContainer) {
-                    // This is a system message (like boosts, joins, etc)
-                    const messageContent =
-                        systemContainer.querySelector('[class*="content_"]')?.textContent?.trim() || "";
-                    const timestampEl = systemContainer.querySelector("time");
+                    // Try to parse as a system message first
+                    const systemContainer = contentsEl.querySelector('[class*="container_"][class*="compact_"]');
+                    if (systemContainer) {
+                        // This is a system message (like boosts, joins, etc)
+                        const messageContent =
+                            systemContainer.querySelector('[class*="content_"]')?.textContent?.trim() || "";
+                        const timestampEl = systemContainer.querySelector("time");
+                        if (!timestampEl) {
+                            throw new Error("Failed to find timestamp in system message");
+                        }
+
+                        const dateTime = timestampEl.getAttribute("datetime");
+                        if (!dateTime) {
+                            throw new Error("Failed to find datetime attribute in system message");
+                        }
+
+                        const timestamp = new Date(dateTime).getTime();
+
+                        // For system messages, we'll use "System" as the author
+                        return {
+                            id,
+                            author: "System",
+                            timestamp,
+                            content: messageContent,
+                            htmlContent: systemContainer.outerHTML,
+                            children: [],
+                            originalElement: el as HTMLElement,
+                        };
+                    }
+
+                    // If not a system message, proceed with regular message parsing
+                    const headerEl = contentsEl.querySelector('[class^="header_"]');
+                    if (!headerEl) {
+                        throw new Error("Failed to find header element");
+                    }
+
+                    const author = headerEl
+                        .querySelector('[id^="message-username-"] > span[class^="username_"]')
+                        ?.textContent?.trim();
+                    if (!author) {
+                        throw new Error("Failed to find author element");
+                    }
+
+                    const timestampEl = headerEl.querySelector("time");
                     if (!timestampEl) {
-                        throw new Error("Failed to find timestamp in system message");
+                        throw new Error("Failed to find timestamp element");
                     }
 
                     const dateTime = timestampEl.getAttribute("datetime");
                     if (!dateTime) {
-                        throw new Error("Failed to find datetime attribute in system message");
+                        throw new Error("Failed to find datetime attribute");
                     }
 
                     const timestamp = new Date(dateTime).getTime();
 
-                    // For system messages, we'll use "System" as the author
+                    const messageContentEl = contentsEl.querySelector('[id^="message-content-"]');
+                    if (!messageContentEl) {
+                        throw new Error("Failed to find message content element");
+                    }
+
+                    // Find accessories/embeds container
+                    const accessoriesId = `message-accessories-${id}`;
+                    const accessoriesEl = el.querySelector(`#${accessoriesId}`);
+
+                    // Find reactions container
+                    const reactionsEl = el.querySelector('[class*="reactions_"]');
+
+                    // Debug image detection in both content and accessories
+                    const contentImages = messageContentEl.querySelectorAll("img:not([class*='emoji_'])");
+                    const accessoryImages = accessoriesEl
+                        ? accessoriesEl.querySelectorAll("img:not([class*='emoji_']):not([class*='reaction'])")
+                        : [];
+                    const totalImages = contentImages.length + accessoryImages.length;
+
+                    // Get text content for preview, handling image-only messages
+                    let textContent = messageContentEl.textContent || "";
+
+                    // If there's no text content, check if it's just emojis
+                    if (!textContent) {
+                        const emojiContent = Array.from(messageContentEl.querySelectorAll('img[class*="emoji"]'))
+                            .map(
+                                (img) =>
+                                    (img instanceof HTMLImageElement ? img.alt : "") ||
+                                    img.getAttribute("aria-label") ||
+                                    "",
+                            )
+                            .join("");
+
+                        if (emojiContent) {
+                            textContent = emojiContent;
+                        } else if (totalImages > 0) {
+                            textContent = "🖼️ Image";
+                        } else if (accessoriesEl) {
+                            const links = accessoriesEl.querySelectorAll("a[href]");
+                            if (links.length > 0) {
+                                textContent = "🔗 Link";
+                            }
+                        }
+                    } else {
+                        // Convert line breaks to spaces for preview
+                        textContent = textContent.replace(/\s*[\r\n]+\s*/g, " ").trim();
+
+                        // Add embed indicators to the preview if present
+                        if (totalImages > 0) {
+                            textContent += " 🖼️ Image";
+                        } else if (accessoriesEl) {
+                            const links = accessoriesEl.querySelectorAll("a[href]");
+                            if (links.length > 0) {
+                                textContent += " 🔗 Link";
+                            }
+                        }
+                    }
+
+                    // Clone both content and accessories
+                    const contentClone = messageContentEl.cloneNode(true) as HTMLElement;
+                    let fullContent = contentClone;
+
+                    if (accessoriesEl) {
+                        // Convert embeds to plain text links (excluding reactions)
+                        const links = Array.from(
+                            accessoriesEl.querySelectorAll<HTMLAnchorElement>(
+                                'a[href]:not([class*="reaction"]):not([class*="originalLink_"]):not(article *)',
+                            ),
+                        ).map((a) => a.href);
+
+                        // Handle image wrappers specially
+                        const imageWrappers = Array.from(
+                            accessoriesEl.querySelectorAll('div[class*="imageWrapper_"]:not(article *)'),
+                        );
+                        const imageLinks = imageWrappers
+                            .map((wrapper) => {
+                                const link = wrapper.querySelector('a[class*="originalLink_"]');
+                                return link instanceof HTMLAnchorElement ? link.href : null;
+                            })
+                            .filter((url): url is string => url !== null);
+
+                        // Handle regular images (not in wrappers)
+                        const standaloneImages = Array.from(
+                            accessoriesEl.querySelectorAll<HTMLImageElement>(
+                                'img[src]:not([data-type="emoji"]):not(.lazyImg_)',
+                            ),
+                        ).map((img) => img.src);
+
+                        // Create a container for content, links, and reactions
+                        const container = document.createElement("div");
+                        container.appendChild(contentClone);
+
+                        // Add reactions if present
+                        if (reactionsEl) {
+                            const reactionsClone = reactionsEl.cloneNode(true) as HTMLElement;
+                            // Remove the "add reaction" button
+                            const addReactionBtn = reactionsClone.querySelector('div[class*="reactionBtn_"]');
+                            if (addReactionBtn) {
+                                addReactionBtn.remove();
+                            }
+                            container.appendChild(reactionsClone);
+                        }
+
+                        // Add all unique links
+                        const uniqueLinks = [...new Set([...links, ...imageLinks])];
+                        if (uniqueLinks.length > 0) {
+                            const linkList = document.createElement("div");
+                            linkList.classList.add("embed-links");
+
+                            uniqueLinks.forEach((url) => {
+                                const link = document.createElement("a");
+                                link.href = url;
+                                // Add indicator based on URL pattern
+                                let prefix = "🔗";
+                                if (imageLinks.includes(url)) {
+                                    prefix = "🖼️";
+                                }
+                                // Truncate long URLs
+                                if (url.length > 70) {
+                                    const start = url.slice(0, 35);
+                                    const end = url.slice(-30);
+                                    link.textContent = `${prefix}\u00A0${start}...${end}`;
+                                    link.title = url; // Show full URL on hover
+                                } else {
+                                    link.textContent = `${prefix}\u00A0${url}`;
+                                }
+                                link.target = "_blank";
+                                link.rel = "noopener noreferrer";
+
+                                const linkContainer = document.createElement("div");
+                                linkContainer.appendChild(link);
+                                linkList.appendChild(linkContainer);
+                            });
+
+                            container.appendChild(linkList);
+                        }
+
+                        fullContent = container;
+                    }
+
+                    // Fix all image sources in the cloned content
+                    fullContent.querySelectorAll("img").forEach((img, idx) => {
+                        const originalSrc = img.src;
+                        if (img.src) {
+                            img.src = img.src; // Force a re-assignment to resolve any relative URLs
+                        }
+                        if (img.getAttribute("aria-label")) {
+                            img.alt = img.getAttribute("aria-label") || "";
+                        }
+                    });
+
+                    let parentId: string | undefined = undefined;
+                    let parentPreview: { author: string; content: string } | undefined = undefined;
+                    const replyContextMaybe = el.querySelector('[id^="message-reply-context-"]');
+                    if (replyContextMaybe) {
+                        const parentContentEl = replyContextMaybe.querySelector('[id^="message-content-"]');
+                        parentId = parentContentEl?.id.split("-").pop() || "";
+
+                        // Extract parent preview content and author
+                        const repliedTextContent = replyContextMaybe.querySelector('[class*="repliedTextContent_"]');
+                        const parentAuthorEl = replyContextMaybe.querySelector('[class*="username_"]');
+                        if (repliedTextContent && parentAuthorEl) {
+                            parentPreview = {
+                                author: parentAuthorEl.textContent?.trim().replace(/^@/, "") || "Unknown",
+                                content: repliedTextContent.innerHTML,
+                            };
+                        }
+                    }
+
                     return {
                         id,
-                        author: "System",
+                        author,
                         timestamp,
-                        content: messageContent,
-                        htmlContent: systemContainer.outerHTML,
+                        content: textContent,
+                        htmlContent: fullContent.innerHTML,
+                        parentId,
+                        parentPreview,
                         children: [],
                         originalElement: el as HTMLElement,
                     };
+                } catch (error) {
+                    console.error("Error parsing message:", error);
+                    // Create an error message that shows what went wrong
+                    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+                    return {
+                        id: el.id.split("-").pop() || "",
+                        author: "Error",
+                        timestamp: Date.now(), // Use current time for error messages
+                        content: `Failed to parse message: ${errorMessage}`,
+                        htmlContent: `<div class="error-message">Failed to parse message: ${errorMessage}</div>`,
+                        children: [],
+                        originalElement: el as HTMLElement,
+                        isError: true, // Mark this as an error message
+                    };
                 }
-
-                // If not a system message, proceed with regular message parsing
-                const headerEl = contentsEl.querySelector('[class^="header_"]');
-                if (!headerEl) {
-                    throw new Error("Failed to find header element");
-                }
-
-                const author = headerEl
-                    .querySelector('[id^="message-username-"] > span[class^="username_"]')
-                    ?.textContent?.trim();
-                if (!author) {
-                    throw new Error("Failed to find author element");
-                }
-
-                const timestampEl = headerEl.querySelector("time");
-                if (!timestampEl) {
-                    throw new Error("Failed to find timestamp element");
-                }
-
-                const dateTime = timestampEl.getAttribute("datetime");
-                if (!dateTime) {
-                    throw new Error("Failed to find datetime attribute");
-                }
-
-                const timestamp = new Date(dateTime).getTime();
-
-                const messageContentEl = contentsEl.querySelector('[id^="message-content-"]');
-                if (!messageContentEl) {
-                    throw new Error("Failed to find message content element");
-                }
-
-                // Find accessories/embeds container
-                const accessoriesId = `message-accessories-${id}`;
-                const accessoriesEl = el.querySelector(`#${accessoriesId}`);
-
-                // Find reactions container
-                const reactionsEl = el.querySelector('[class*="reactions_"]');
-
-                // Debug image detection in both content and accessories
-                const contentImages = messageContentEl.querySelectorAll("img:not([class*='emoji_'])");
-                const accessoryImages = accessoriesEl
-                    ? accessoriesEl.querySelectorAll("img:not([class*='emoji_']):not([class*='reaction'])")
-                    : [];
-                const totalImages = contentImages.length + accessoryImages.length;
-
-                // Get text content for preview, handling image-only messages
-                let textContent = messageContentEl.textContent || "";
-
-                // If there's no text content, check if it's just emojis
-                if (!textContent) {
-                    const emojiContent = Array.from(messageContentEl.querySelectorAll('img[class*="emoji"]'))
-                        .map(
-                            (img) =>
-                                (img instanceof HTMLImageElement ? img.alt : "") ||
-                                img.getAttribute("aria-label") ||
-                                "",
-                        )
-                        .join("");
-
-                    if (emojiContent) {
-                        textContent = emojiContent;
-                    } else if (totalImages > 0) {
-                        textContent = "🖼️ Image";
-                    } else if (accessoriesEl) {
-                        const links = accessoriesEl.querySelectorAll("a[href]");
-                        if (links.length > 0) {
-                            textContent = "🔗 Link";
-                        }
-                    }
-                } else {
-                    // Convert line breaks to spaces for preview
-                    textContent = textContent.replace(/\s*[\r\n]+\s*/g, " ").trim();
-
-                    // Add embed indicators to the preview if present
-                    if (totalImages > 0) {
-                        textContent += " 🖼️ Image";
-                    } else if (accessoriesEl) {
-                        const links = accessoriesEl.querySelectorAll("a[href]");
-                        if (links.length > 0) {
-                            textContent += " 🔗 Link";
-                        }
-                    }
-                }
-
-                // Clone both content and accessories
-                const contentClone = messageContentEl.cloneNode(true) as HTMLElement;
-                let fullContent = contentClone;
-
-                if (accessoriesEl) {
-                    // Convert embeds to plain text links (excluding reactions)
-                    const links = Array.from(
-                        accessoriesEl.querySelectorAll<HTMLAnchorElement>(
-                            'a[href]:not([class*="reaction"]):not([class*="originalLink_"]):not(article *)',
-                        ),
-                    ).map((a) => a.href);
-
-                    // Handle image wrappers specially
-                    const imageWrappers = Array.from(
-                        accessoriesEl.querySelectorAll('div[class*="imageWrapper_"]:not(article *)'),
-                    );
-                    const imageLinks = imageWrappers
-                        .map((wrapper) => {
-                            const link = wrapper.querySelector('a[class*="originalLink_"]');
-                            return link instanceof HTMLAnchorElement ? link.href : null;
-                        })
-                        .filter((url): url is string => url !== null);
-
-                    // Handle regular images (not in wrappers)
-                    const standaloneImages = Array.from(
-                        accessoriesEl.querySelectorAll<HTMLImageElement>(
-                            'img[src]:not([data-type="emoji"]):not(.lazyImg_)',
-                        ),
-                    ).map((img) => img.src);
-
-                    // Create a container for content, links, and reactions
-                    const container = document.createElement("div");
-                    container.appendChild(contentClone);
-
-                    // Add reactions if present
-                    if (reactionsEl) {
-                        const reactionsClone = reactionsEl.cloneNode(true) as HTMLElement;
-                        // Remove the "add reaction" button
-                        const addReactionBtn = reactionsClone.querySelector('div[class*="reactionBtn_"]');
-                        if (addReactionBtn) {
-                            addReactionBtn.remove();
-                        }
-                        container.appendChild(reactionsClone);
-                    }
-
-                    // Add all unique links
-                    const uniqueLinks = [...new Set([...links, ...imageLinks])];
-                    if (uniqueLinks.length > 0) {
-                        const linkList = document.createElement("div");
-                        linkList.classList.add("embed-links");
-
-                        uniqueLinks.forEach((url) => {
-                            const link = document.createElement("a");
-                            link.href = url;
-                            // Add indicator based on URL pattern
-                            let prefix = "🔗";
-                            if (imageLinks.includes(url)) {
-                                prefix = "🖼️";
-                            }
-                            // Truncate long URLs
-                            if (url.length > 70) {
-                                const start = url.slice(0, 35);
-                                const end = url.slice(-30);
-                                link.textContent = `${prefix}\u00A0${start}...${end}`;
-                                link.title = url; // Show full URL on hover
-                            } else {
-                                link.textContent = `${prefix}\u00A0${url}`;
-                            }
-                            link.target = "_blank";
-                            link.rel = "noopener noreferrer";
-
-                            const linkContainer = document.createElement("div");
-                            linkContainer.appendChild(link);
-                            linkList.appendChild(linkContainer);
-                        });
-
-                        container.appendChild(linkList);
-                    }
-
-                    fullContent = container;
-                }
-
-                // Fix all image sources in the cloned content
-                fullContent.querySelectorAll("img").forEach((img, idx) => {
-                    const originalSrc = img.src;
-                    if (img.src) {
-                        img.src = img.src; // Force a re-assignment to resolve any relative URLs
-                    }
-                    if (img.getAttribute("aria-label")) {
-                        img.alt = img.getAttribute("aria-label") || "";
-                    }
-                });
-
-                let parentId: string | undefined = undefined;
-                let parentPreview: { author: string; content: string } | undefined = undefined;
-                const replyContextMaybe = el.querySelector('[id^="message-reply-context-"]');
-                if (replyContextMaybe) {
-                    const parentContentEl = replyContextMaybe.querySelector('[id^="message-content-"]');
-                    parentId = parentContentEl?.id.split("-").pop() || "";
-
-                    // Extract parent preview content and author
-                    const repliedTextContent = replyContextMaybe.querySelector('[class*="repliedTextContent_"]');
-                    const parentAuthorEl = replyContextMaybe.querySelector('[class*="username_"]');
-                    if (repliedTextContent && parentAuthorEl) {
-                        parentPreview = {
-                            author: parentAuthorEl.textContent?.trim().replace(/^@/, "") || "Unknown",
-                            content: repliedTextContent.innerHTML,
-                        };
-                    }
-                }
-
-                return {
-                    id,
-                    author,
-                    timestamp,
-                    content: textContent,
-                    htmlContent: fullContent.innerHTML,
-                    parentId,
-                    parentPreview,
-                    children: [],
-                    originalElement: el as HTMLElement,
-                };
-            } catch (error) {
-                console.error("Error parsing message:", error);
-                // Create an error message that shows what went wrong
-                const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-                return {
-                    id: el.id.split("-").pop() || "",
-                    author: "Error",
-                    timestamp: Date.now(), // Use current time for error messages
-                    content: `Failed to parse message: ${errorMessage}`,
-                    htmlContent: `<div class="error-message">Failed to parse message: ${errorMessage}</div>`,
-                    children: [],
-                    originalElement: el as HTMLElement,
-                    isError: true, // Mark this as an error message
-                };
-            }
-        });
+            },
+        );
 
         // Filter out any null messages and sort by timestamp
         return messages.filter((msg) => msg !== null).sort((a, b) => a.timestamp - b.timestamp);
@@ -466,10 +464,10 @@ class Threadloaf {
 
     // Render the thread UI
     private renderThread(): void {
-        if (!this.threadContainer) return;
+        if (!this.state.threadContainer) return;
 
         // Check if we're at the top of the thread
-        this.isTopLoaded = this.checkIfTopLoaded();
+        this.state.isTopLoaded = this.checkIfTopLoaded();
 
         // Store currently expanded message ID before re-render
         const expandedMessage = document.querySelector(".threadloaf-message.expanded");
@@ -520,14 +518,14 @@ class Threadloaf {
             const handleClick = (newIsThreadView: boolean) => {
                 if (newIsThreadView === isThreadView) return; // No change needed
 
-                this.isThreadViewActive = newIsThreadView; // Update the view state
+                this.state.isThreadViewActive = newIsThreadView; // Update the view state
 
                 if (newIsThreadView) {
                     // Switch to thread view
-                    if (this.threadContainer) {
-                        this.threadContainer.style.display = "none";
+                    if (this.state.threadContainer) {
+                        this.state.threadContainer.style.display = "none";
                         // Re-add our scroll override
-                        const scrollerElement = this.threadContainer.closest('div[class*="scroller_"]');
+                        const scrollerElement = this.state.threadContainer.closest('div[class*="scroller_"]');
                         if (scrollerElement) {
                             const scrollerClass = Array.from(scrollerElement.classList).find((className) =>
                                 className.startsWith("scroller_"),
@@ -547,10 +545,10 @@ class Threadloaf {
                     }
                 } else {
                     // Switch to normal view
-                    if (this.threadContainer) {
-                        this.threadContainer.style.display = "block";
+                    if (this.state.threadContainer) {
+                        this.state.threadContainer.style.display = "block";
                         // Remove our scroll override
-                        const scrollerElement = this.threadContainer.closest('div[class*="scroller_"]');
+                        const scrollerElement = this.state.threadContainer.closest('div[class*="scroller_"]');
                         if (scrollerElement) {
                             const scrollerClass = Array.from(scrollerElement.classList).find((className) =>
                                 className.startsWith("scroller_"),
@@ -585,7 +583,7 @@ class Threadloaf {
             this.updateFloatButtonPosition();
 
             // Set up resize observer for the channel container
-            const channelContainer = this.threadContainer?.closest('div[class*="chat_"]');
+            const channelContainer = this.state.threadContainer?.closest('div[class*="chat_"]');
             if (channelContainer) {
                 const resizeObserver = new ResizeObserver(() => {
                     this.updateFloatButtonPosition();
@@ -600,7 +598,7 @@ class Threadloaf {
         };
 
         // Initial floating button creation
-        createFloatButton(this.isThreadViewActive);
+        createFloatButton(this.state.isThreadViewActive);
 
         // Parse messages and build tree
         const rawMessages = this.parseMessages();
@@ -731,9 +729,9 @@ class Threadloaf {
         threadContent.appendChild(renderMessages(rootMessages));
 
         // Hide original thread container and append custom UI
-        if (this.isThreadViewActive) {
-            this.threadContainer.style.display = "none";
-            const parentElement = this.threadContainer.parentElement;
+        if (this.state.isThreadViewActive) {
+            this.state.threadContainer.style.display = "none";
+            const parentElement = this.state.threadContainer.parentElement;
             if (parentElement) {
                 parentElement.style.position = "relative";
                 parentElement.appendChild(threadloafContainer);
@@ -749,7 +747,7 @@ class Threadloaf {
                 }
             }
         } else {
-            this.threadContainer.style.display = "block";
+            this.state.threadContainer.style.display = "block";
             // Remove any existing threadloaf container
             const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
@@ -1184,7 +1182,7 @@ class Threadloaf {
 
     // Attach a MutationObserver to monitor DOM changes
     private setupMutationObserver(): void {
-        this.observer = new MutationObserver((mutations) => {
+        this.state.observer = new MutationObserver((mutations) => {
             let shouldRerender = false;
 
             for (const mutation of mutations) {
@@ -1214,11 +1212,11 @@ class Threadloaf {
             if (shouldRerender) {
                 const newThreadContainer = this.findThreadContainer();
                 if (newThreadContainer) {
-                    this.threadContainer = newThreadContainer;
+                    this.state.threadContainer = newThreadContainer;
                     this.renderThread();
 
                     // Only scroll to bottom if we're in thread view AND we're not loading more messages
-                    if (this.isThreadViewActive && !this.isLoadingMore) {
+                    if (this.state.isThreadViewActive && !this.state.isLoadingMore) {
                         const threadContent = document.getElementById("threadloaf-content");
                         if (threadContent) {
                             threadContent.scrollTop = threadContent.scrollHeight;
@@ -1228,7 +1226,7 @@ class Threadloaf {
             }
         });
 
-        this.observer.observe(this.appContainer!, {
+        this.state.observer.observe(this.state.appContainer!, {
             childList: true,
             subtree: true,
             characterData: true, // Needed for text content changes
@@ -1244,8 +1242,8 @@ class Threadloaf {
             attempts++;
             const newThreadContainer = this.findThreadContainer();
 
-            if (newThreadContainer && newThreadContainer !== this.threadContainer) {
-                this.threadContainer = newThreadContainer;
+            if (newThreadContainer && newThreadContainer !== this.state.threadContainer) {
+                this.state.threadContainer = newThreadContainer;
                 this.renderThread();
             }
 
@@ -1270,11 +1268,11 @@ class Threadloaf {
         this.findAndHideHeader();
 
         // Keep watching for header changes
-        this.headerObserver = new MutationObserver(() => {
+        this.state.headerObserver = new MutationObserver(() => {
             this.findAndHideHeader();
         });
 
-        this.headerObserver.observe(document.body, {
+        this.state.headerObserver.observe(document.body, {
             childList: true,
             subtree: true,
         });
@@ -1360,7 +1358,7 @@ class Threadloaf {
 
     private updateFloatButtonPosition(): void {
         const floatButton = document.getElementById("threadloaf-float-button");
-        const channelContainer = this.threadContainer?.closest('div[class*="chat_"]');
+        const channelContainer = this.state.threadContainer?.closest('div[class*="chat_"]');
 
         if (floatButton && channelContainer) {
             const channelRect = channelContainer.getBoundingClientRect();
@@ -1385,15 +1383,15 @@ class Threadloaf {
     }
 
     private checkIfTopLoaded(): boolean {
-        if (!this.threadContainer) {
+        if (!this.state.threadContainer) {
             console.log("checkIfTopLoaded: No thread container found");
             return false;
         }
 
-        console.log("checkIfTopLoaded: Checking children of thread container:", this.threadContainer.children);
+        console.log("checkIfTopLoaded: Checking children of thread container:", this.state.threadContainer.children);
 
         // Check if there's a container div with a heading-xxl/extrabold class as a direct child
-        const topContainer = Array.from(this.threadContainer.children).find((child) => {
+        const topContainer = Array.from(this.state.threadContainer.children).find((child) => {
             if (!(child instanceof HTMLElement)) {
                 console.log("checkIfTopLoaded: Child is not an HTMLElement:", child);
                 return false;
@@ -1443,25 +1441,25 @@ class Threadloaf {
         loadUpButton.className = "load-up-button";
         loadUpButton.textContent = "Load More";
         loadUpButton.title = "Load earlier messages";
-        loadUpButton.style.opacity = this.isTopLoaded ? "0" : "1";
-        loadUpButton.style.visibility = this.isTopLoaded ? "hidden" : "visible";
+        loadUpButton.style.opacity = this.state.isTopLoaded ? "0" : "1";
+        loadUpButton.style.visibility = this.state.isTopLoaded ? "hidden" : "visible";
 
         let isLoading = false;
         loadUpButton.onclick = async () => {
             if (isLoading) return;
 
-            const scrollerElement = this.threadContainer?.closest('div[class*="scroller_"]');
+            const scrollerElement = this.state.threadContainer?.closest('div[class*="scroller_"]');
             if (!scrollerElement) return;
 
             isLoading = true;
-            this.isLoadingMore = true; // Set flag before loading
+            this.state.isLoadingMore = true; // Set flag before loading
             loadUpButton.disabled = true;
 
             // If we're in thread view, temporarily switch to chat view
-            const wasInThreadView = this.isThreadViewActive;
+            const wasInThreadView = this.state.isThreadViewActive;
             if (wasInThreadView) {
                 // Switch to chat view
-                this.threadContainer!.style.display = "block";
+                this.state.threadContainer!.style.display = "block";
                 const threadloafContainer = document.getElementById("threadloaf-container");
                 if (threadloafContainer) {
                     threadloafContainer.remove();
@@ -1488,7 +1486,7 @@ class Threadloaf {
 
             // Switch back to thread view if we were in it
             if (wasInThreadView) {
-                this.isThreadViewActive = true;
+                this.state.isThreadViewActive = true;
                 this.renderThread();
 
                 // After rendering, scroll to top of thread view
@@ -1501,13 +1499,13 @@ class Threadloaf {
             // Re-enable after a delay
             setTimeout(() => {
                 isLoading = false;
-                this.isLoadingMore = false;
+                this.state.isLoadingMore = false;
                 loadUpButton.disabled = false;
 
                 // Check if we're at the top after loading
-                this.isTopLoaded = this.checkIfTopLoaded();
-                loadUpButton.style.opacity = this.isTopLoaded ? "0" : "1";
-                loadUpButton.style.visibility = this.isTopLoaded ? "hidden" : "visible";
+                this.state.isTopLoaded = this.checkIfTopLoaded();
+                loadUpButton.style.opacity = this.state.isTopLoaded ? "0" : "1";
+                loadUpButton.style.visibility = this.state.isTopLoaded ? "hidden" : "visible";
             }, 1000);
         };
 
@@ -1515,5 +1513,7 @@ class Threadloaf {
     }
 }
 
-// Initialize the Threadloaf class
-new Threadloaf();
+(function () {
+    var state = new ThreadloafState();
+    new Threadloaf(state);
+})();

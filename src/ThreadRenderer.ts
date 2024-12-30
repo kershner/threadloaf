@@ -343,7 +343,7 @@ class ThreadRenderer {
     private createLoadUpButton(): HTMLButtonElement {
         const loadUpButton = document.createElement("button");
         loadUpButton.className = "load-up-button";
-        loadUpButton.textContent = "Older";
+        loadUpButton.textContent = "🠉";
         loadUpButton.title = "Load earlier messages";
         loadUpButton.disabled = this.state.isTopLoaded;
 
@@ -413,7 +413,7 @@ class ThreadRenderer {
     private createNewestButton(): HTMLButtonElement {
         const newestButton = document.createElement("button");
         newestButton.className = "newest-button";
-        newestButton.textContent = "Newest";
+        newestButton.textContent = "🠋";
         newestButton.title = "Jump to newest message";
 
         newestButton.onclick = () => {

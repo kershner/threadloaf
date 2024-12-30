@@ -1,6 +1,22 @@
 /// <reference path="./DomMutator.ts" />
 /// <reference path="./ThreadloafState.ts" />
 
+/*
+ * IMPORTANT: Discord Class/ID Naming Pattern
+ *
+ * Discord dynamically generates unique suffixes for all classes and IDs.
+ * - Classes use underscores: "foo_[random]"  (e.g., "container_c2668b", "scroller_e2e187")
+ * - IDs use hyphens: "bar-[random]"  (e.g., "message-content-123456", "chat-messages-789")
+ *
+ * NEVER do exact matches like:
+ *   element.classList.contains("container_")  // WRONG
+ *   document.getElementById("message-content") // WRONG
+ *
+ * ALWAYS use pattern matching:
+ *   element.classList.some(cls => cls.startsWith("container_"))  // Correct
+ *   document.querySelector('[id^="message-content-"]')  // Correct
+ */
+
 /**
  * Handles DOM traversal and element discovery in Discord's interface.
  * Responsible for finding key UI elements, setting up mutation observers

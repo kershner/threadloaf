@@ -147,7 +147,7 @@ class Threadloaf {
         if (!this.state.threadContainer) return;
 
         // Check if we're at the top of the thread
-        this.state.isTopLoaded = this.checkIfTopLoaded();
+        this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
 
         // Store currently expanded message ID before re-render
         const expandedMessage = document.querySelector(".threadloaf-message.expanded");
@@ -591,60 +591,6 @@ class Threadloaf {
         }
     }
 
-    private checkIfTopLoaded(): boolean {
-        if (!this.state.threadContainer) {
-            console.log("checkIfTopLoaded: No thread container found");
-            return false;
-        }
-
-        console.log("checkIfTopLoaded: Checking children of thread container:", this.state.threadContainer.children);
-
-        // Check if there's a container div with a heading-xxl/extrabold class as a direct child
-        const topContainer = Array.from(this.state.threadContainer.children).find((child) => {
-            if (!(child instanceof HTMLElement)) {
-                console.log("checkIfTopLoaded: Child is not an HTMLElement:", child);
-                return false;
-            }
-
-            console.log("checkIfTopLoaded: Checking child classes:", child.classList);
-            const hasContainerClass = Array.from(child.classList).some((cls) => cls.startsWith("container_"));
-            if (!hasContainerClass) {
-                console.log("checkIfTopLoaded: Child doesn't have container_ class:", child);
-                return false;
-            }
-
-            console.log("checkIfTopLoaded: Found container, checking for heading:", child.children);
-            const hasHeading = Array.from(child.children).some((grandChild) => {
-                if (!(grandChild instanceof HTMLElement)) {
-                    console.log("checkIfTopLoaded: Grandchild is not an HTMLElement:", grandChild);
-                    return false;
-                }
-
-                console.log("checkIfTopLoaded: Checking grandchild:", {
-                    tagName: grandChild.tagName,
-                    classList: grandChild.classList,
-                });
-
-                const isHeading =
-                    grandChild.tagName === "H3" &&
-                    Array.from(grandChild.classList).some(
-                        (cls) => cls.startsWith("heading-xxl") || cls.startsWith("extrabold"),
-                    );
-
-                if (isHeading) {
-                    console.log("checkIfTopLoaded: Found heading with required classes");
-                }
-                return isHeading;
-            });
-
-            return hasHeading;
-        });
-
-        const result = !!topContainer;
-        console.log("checkIfTopLoaded: Final result:", result);
-        return result;
-    }
-
     private createLoadUpButton(): HTMLButtonElement {
         const loadUpButton = document.createElement("button");
         loadUpButton.className = "load-up-button";
@@ -712,7 +658,7 @@ class Threadloaf {
                 loadUpButton.disabled = false;
 
                 // Check if we're at the top after loading
-                this.state.isTopLoaded = this.checkIfTopLoaded();
+                this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
                 loadUpButton.style.opacity = this.state.isTopLoaded ? "0" : "1";
                 loadUpButton.style.visibility = this.state.isTopLoaded ? "hidden" : "visible";
             }, 1000);

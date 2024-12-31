@@ -109,11 +109,8 @@ class ThreadRenderer {
                     // Re-render thread to get latest messages
                     this.renderThread();
                     createFloatButton(true);
-                    // Scroll thread view to bottom
-                    const threadContent = document.getElementById("threadloaf-content");
-                    if (threadContent) {
-                        threadContent.scrollTop = threadContent.scrollHeight;
-                    }
+                    // Scroll to newest message
+                    this.scrollToNewestMessage();
                 } else {
                     // Switch to normal view
                     if (this.state.threadContainer) {
@@ -206,6 +203,11 @@ class ThreadRenderer {
         const messageBold = new Map<string, boolean>();
 
         const numGradientMessages = Math.min(15, colorSortedMessages.length);
+
+        // Store the newest message ID if we have messages
+        if (colorSortedMessages.length > 0) {
+            this.state.newestMessageId = colorSortedMessages[0].id;
+        }
 
         colorSortedMessages.forEach((msg, index) => {
             let color;
@@ -335,10 +337,7 @@ class ThreadRenderer {
 
                 // Then restore scroll position with zero timeout
                 setTimeout(() => {
-                    const newThreadContent = document.getElementById("threadloaf-content");
-                    if (newThreadContent) {
-                        newThreadContent.scrollTop = scrollTop;
-                    }
+                    this.scrollToNewestMessage();
                 }, 0);
             }
         } else {
@@ -443,24 +442,8 @@ class ThreadRenderer {
                     if (fullContent) fullContent.style.display = "none";
                 }
 
-                // 2. Find the most recent message (it's in bold)
-                const messages = Array.from(document.querySelectorAll(".threadloaf-message"));
-                const newestMessage = messages.find((msg) => {
-                    const preview = msg.querySelector(".message-content.preview") as HTMLElement;
-                    return preview && preview.style.fontWeight === "bold";
-                });
-
-                if (newestMessage) {
-                    // 3. Expand the newest message
-                    newestMessage.classList.add("expanded");
-                    const previewContainer = newestMessage.querySelector(".preview-container") as HTMLElement;
-                    const fullContent = newestMessage.querySelector(".full-content") as HTMLElement;
-                    if (previewContainer) previewContainer.style.display = "none";
-                    if (fullContent) fullContent.style.display = "block";
-
-                    // 4. Scroll to show it (without animation)
-                    newestMessage.scrollIntoView({ behavior: "auto", block: "center" });
-                }
+                // 2. Scroll to newest message and expand it
+                this.scrollToNewestMessage(true);
             } else {
                 // In Chat mode: scroll the original chat container to bottom
                 if (this.state.threadContainer) {
@@ -483,6 +466,29 @@ class ThreadRenderer {
             const channelRect = channelContainer.getBoundingClientRect();
             const channelCenter = channelRect.left + channelRect.width / 2;
             floatButton.style.left = `${channelCenter}px`;
+        }
+    }
+
+    private scrollToNewestMessage(shouldExpand: boolean = false): void {
+        if (!this.state.newestMessageId) return;
+
+        // Find the newest message by its ID
+        const newestMessage = document.querySelector(
+            `.threadloaf-message[data-msg-id="${this.state.newestMessageId}"]`,
+        ) as HTMLElement;
+
+        if (newestMessage) {
+            if (shouldExpand) {
+                // Expand the newest message
+                newestMessage.classList.add("expanded");
+                const previewContainer = newestMessage.querySelector(".preview-container") as HTMLElement;
+                const fullContent = newestMessage.querySelector(".full-content") as HTMLElement;
+                if (previewContainer) previewContainer.style.display = "none";
+                if (fullContent) fullContent.style.display = "block";
+            }
+
+            // Scroll to show it (without animation)
+            newestMessage.scrollIntoView({ behavior: "auto", block: "center" });
         }
     }
 }

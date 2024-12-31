@@ -11,4 +11,5 @@ class ThreadloafState {
     public isThreadViewActive: boolean = false;
     public isTopLoaded: boolean = false;
     public isLoadingMore: boolean = false;
+    public newestMessageId: string | null = null;
 }

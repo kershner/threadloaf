@@ -78,11 +78,6 @@ class MessageTreeBuilder {
                         rootMessages.push(message);
                         continue;
                     }
-                } else {
-                    // Rule 3: Different author within 3 minutes - treat as reply to previous message
-                    previousMessage.children?.push(message);
-                    message.parentId = previousMessage.id;
-                    continue;
                 }
             }
 

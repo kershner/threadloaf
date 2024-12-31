@@ -11,10 +11,7 @@ This document describes the rules for building a message tree structure. The goa
    - From the same author
    Then treat the new message as having the same parent as the preceding message. This allows users to write multi-line messages that all become children of the same parent.
 
-3. **Different Author Within 3 Minutes**: If a message is not an explicit reply, look at the immediately preceding message. If that message is:
-   - Within 3 minutes
-   - From a different author
-   Then treat the new message as a direct reply to the preceding message. This allows users to have back-and-forth discussions without using the "reply" function.
+Any message that doesn't match these rules (i.e., a non-reply message from a different author) will be parented to the root of the conversation.
 
 ## Example Scenarios
 
@@ -32,7 +29,7 @@ X
 └── A3 (same parent as A1)
 ```
 
-### Scenario 2: Back-and-forth conversation
+### Scenario 2: Back-and-forth conversation with no explicit replies
 ```
 A1: "Hello"
 B1: "Hi" (within 3min of A1)
@@ -41,10 +38,11 @@ B2: "Good thanks" (within 3min of A2)
 ```
 Result:
 ```
-A1
-└── B1 (reply to A1)
-    └── A2 (reply to B1)
-        └── B2 (reply to A2)
+ROOT
+├── A1
+├── B1
+├── A2
+└── B2
 ```
 
 ### Scenario 3: Mixed explicit and implicit replies
@@ -56,8 +54,9 @@ C1: [explicit reply to A1] "Hey there"
 ```
 Result:
 ```
-A1
-├── B1 (explicit reply)
-│   └── A2 (implicit reply to B1)
-└── C1 (explicit reply)
+ROOT
+├── A1
+│   ├── B1 (explicit reply)
+│   └── C1 (explicit reply)
+└── A2 (no explicit reply, different author than B1)
 ``` 

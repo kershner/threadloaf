@@ -75,16 +75,44 @@ div[class*="chat_"] {
 }
 
 .threadloaf-message {
+    position: relative;
     margin: 0;
     border-radius: 0;
     max-width: 100%;
 }
-
+.threadloaf-message::after {
+    content: "";
+    position: absolute;
+    bottom: 13px;
+    left: 2px;
+    width: 8px;
+    height: 2px;
+    background-color: var(--border-strong);
+}
 .threadloaf-message.expanded {
     background: rgba(255, 255, 255, 0.05);
     border: 0.1px solid #7c7870;
 }
-
+.children-container {
+    position: relative;
+}
+.children-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    background-color: var(--border-strong);
+}
+.threadloaf-message.root-thread::after,
+.threadloaf-message.expanded::after,
+.threadloaf-message.depth-threshold::after,
+.threadloaf-message.no-threadline::after,
+.children-container.no-threadline::before {
+    height: 0;
+    width: 0;
+}
 .preview-container {
     padding: 2px 12px;
     display: inline-flex;

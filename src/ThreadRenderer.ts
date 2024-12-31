@@ -248,28 +248,12 @@ export class ThreadRenderer {
         threadContent.innerHTML = "";
 
         const renderMessages = (messages: MessageInfo[], depth = 0) => {
-            const container = document.createElement("div");
-            container.classList.add("message-thread");
-
-            // Helper function to recursively flatten the tree
-            const flattenMessages = (msgs: MessageInfo[], currentDepth: number): Array<[MessageInfo, number]> => {
-                const result: Array<[MessageInfo, number]> = [];
-                msgs.forEach((msg) => {
-                    result.push([msg, currentDepth]);
-                    if (msg.children && msg.children.length > 0) {
-                        result.push(...flattenMessages(msg.children, currentDepth + 1));
-                    }
-                });
-                return result;
-            };
-
-            // Get flattened list of [message, depth] pairs
-            const flatMessages = flattenMessages(messages, depth);
-
             // Calculate incremental indents
             const MAX_INDENT = 350;
             const FIRST_LEVEL_INDENT = 40;
             const DECAY_RATE = -Math.log(1 - FIRST_LEVEL_INDENT / MAX_INDENT);
+            const MAX_THREADLINE_DEPTH = 10;
+
             const getIncrementalIndent = (level: number): number => {
                 const totalIndentPrev =
                     level === 0 ? 0 : Math.round(MAX_INDENT * (1 - Math.exp(-DECAY_RATE * (level - 1))));
@@ -277,38 +261,60 @@ export class ThreadRenderer {
                 return totalIndentCurr - totalIndentPrev;
             };
 
-            // Create message elements
-            flatMessages.forEach(([message, depth]) => {
+            const createMessageWithChildren = (message: MessageInfo, currentDepth: number): HTMLElement => {
                 const messageContainer = document.createElement("div");
-                messageContainer.style.display = "flex";
-                messageContainer.style.alignItems = "flex-start";
-                messageContainer.style.minWidth = "0"; // Allow container to shrink below children's natural width
-
-                // Create indent spacers
-                for (let i = 0; i < depth; i++) {
-                    const spacer = document.createElement("div");
-                    spacer.style.display = "inline-block";
-                    spacer.style.width = `${getIncrementalIndent(i + 1)}px`;
-                    spacer.style.flexShrink = "0"; // Prevent spacer from shrinking
-                    spacer.style.alignSelf = "stretch";
-                    messageContainer.appendChild(spacer);
-                }
+                messageContainer.classList.add("message-container");
 
                 const messageEl = this.domMutator.createMessageElement(
                     message,
-                    0, // depth is now 0 since we handle indentation here
+                    0,
                     messageColors.get(message.id) || "",
                     messageBold.get(message.id) || false,
                     message.messageNumber || 0,
                     allMessages.length,
                 );
-                messageEl.style.minWidth = "0"; // Allow message to shrink
-                messageEl.style.flexShrink = "1"; // Allow message to shrink
-                messageEl.style.flexGrow = "1"; // Allow message to grow
-                messageEl.style.overflow = "hidden"; // Ensure content doesn't overflow
 
+                // Add class for root posts
+                if (currentDepth === 0) {
+                    messageEl.classList.add("root-thread");
+                }
+
+                // Add class if depth exceeds maxThreadlineDepth
+                if (currentDepth > MAX_THREADLINE_DEPTH) {
+                    messageEl.classList.add("no-threadline");
+                }
+
+                // Append the message element
                 messageContainer.appendChild(messageEl);
-                container.appendChild(messageContainer);
+
+                // Create children container if the message has children
+                if (message.children && message.children.length > 0) {
+                    const childrenContainer = document.createElement("div");
+                    childrenContainer.classList.add("children-container");
+
+                    if (currentDepth + 1 > MAX_THREADLINE_DEPTH) {
+                        childrenContainer.classList.add("no-threadline");
+                    }
+
+                    childrenContainer.style.marginLeft = `${getIncrementalIndent(currentDepth + 1)}px`;
+
+                    message.children.forEach((child) => {
+                        const childElement = createMessageWithChildren(child, currentDepth + 1);
+                        childrenContainer.appendChild(childElement);
+                    });
+
+                    messageContainer.appendChild(childrenContainer);
+                }
+
+                return messageContainer;
+            };
+
+            const container = document.createElement("div");
+            container.classList.add("message-thread");
+
+            messages.forEach((message) => {
+                const rootMessageElement = createMessageWithChildren(message, depth);
+                container.appendChild(rootMessageElement);
             });
 
             return container;

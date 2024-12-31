@@ -107,7 +107,6 @@ div[class*="chat_"] {
 }
 .threadloaf-message.root-thread::after,
 .threadloaf-message.expanded::after,
-.threadloaf-message.depth-threshold::after,
 .threadloaf-message.no-threadline::after,
 .children-container.no-threadline::before {
     height: 0;

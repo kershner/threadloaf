@@ -15,7 +15,5 @@ import { runTests } from "./runTests";
     const domParser = new DomParser(domMutator, state);
     const threadRenderer = new ThreadRenderer(state, domParser, domMutator, messageParser, messageTreeBuilder);
     new Threadloaf(state, domParser, domMutator, threadRenderer);
-
-    // Uncomment to run tests.
-    runTests();
+    //runTests();
 })();

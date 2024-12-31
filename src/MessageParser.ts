@@ -24,8 +24,29 @@ export class MessageParser {
                 const systemContainer = contentsEl.querySelector('[class*="container_"]');
                 if (systemContainer) {
                     // This is a system message (like boosts, joins, etc)
+                    // Clone the container and remove any header div before processing
+                    const containerClone = systemContainer.cloneNode(true) as HTMLElement;
+                    const headerEl = containerClone.querySelector("h3");
+                    if (headerEl) {
+                        headerEl.remove();
+                    }
+
+                    // Replace every <br> with a span containing a space.
+                    containerClone.querySelectorAll("br").forEach((br) => {
+                        const span = document.createElement("span");
+                        span.textContent = " ";
+                        br.parentNode?.replaceChild(span, br);
+                    });
+
+                    // Append a span containing a space to the end of every <div>.
+                    containerClone.querySelectorAll("div").forEach((div) => {
+                        const span = document.createElement("span");
+                        span.textContent = " ";
+                        div.appendChild(span);
+                    });
+
                     const messageContent =
-                        systemContainer.querySelector('[class*="content_"]')?.textContent?.trim() || "";
+                        containerClone.querySelector('[class*="content_"]')?.textContent?.trim() || "";
                     const timestampEl = systemContainer.querySelector("time");
                     if (!timestampEl) {
                         throw new Error("Failed to find timestamp in system message");
@@ -44,7 +65,7 @@ export class MessageParser {
                         author: "System",
                         timestamp,
                         content: messageContent,
-                        htmlContent: systemContainer.outerHTML,
+                        htmlContent: containerClone.outerHTML,
                         children: [],
                         originalElement: el as HTMLElement,
                     };

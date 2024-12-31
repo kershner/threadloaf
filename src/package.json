@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "npm run format && npm run bundle && cp -f manifest.json styles.css threadloaf-128.jpg ../dist/",
+    "build": "npm run format && npm run bundle && cp -f manifest.json styles.css threadloaf-128.jpg popup.html ../dist/",
     "bundle": "esbuild content_script.ts --bundle --outfile=../dist/content_script.js --format=iife --platform=browser --sourcemap",
     "format": "prettier --write \"**/*.ts\""
   },
@@ -9,5 +9,8 @@
     "esbuild": "^0.20.1",
     "prettier": "^3.4.2",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "nanomorph": "^5.4.3"
   }
 }

@@ -4,6 +4,7 @@ import { DomMutator } from "./DomMutator";
 import { MessageParser } from "./MessageParser";
 import { MessageTreeBuilder } from "./MessageTreeBuilder";
 import { MessageInfo } from "./MessageInfo";
+import { DomDiffer } from "./DomDiffer";
 
 /**
  * Manages the rendering of threaded message views in the Discord interface.
@@ -17,6 +18,7 @@ export class ThreadRenderer {
     private domMutator: DomMutator;
     private messageParser: MessageParser;
     private messageTreeBuilder: MessageTreeBuilder;
+    private domDiffer: DomDiffer;
 
     constructor(
         state: ThreadloafState,
@@ -30,6 +32,7 @@ export class ThreadRenderer {
         this.domMutator = domMutator;
         this.messageParser = messageParser;
         this.messageTreeBuilder = messageTreeBuilder;
+        this.domDiffer = new DomDiffer();
     }
 
     // Render the thread UI
@@ -47,19 +50,23 @@ export class ThreadRenderer {
         const expandedMessage = document.querySelector(".threadloaf-message.expanded");
         const expandedMessageId = expandedMessage?.getAttribute("data-msg-id");
 
-        // Clean up any existing threadloaf containers first
-        const existingContainer = document.getElementById("threadloaf-container");
-        if (existingContainer) {
-            existingContainer.remove();
+        // Get existing container or create new one
+        let threadloafContainer = document.getElementById("threadloaf-container");
+        const isNewContainer = !threadloafContainer;
+
+        if (isNewContainer) {
+            threadloafContainer = document.createElement("div");
+            threadloafContainer.id = "threadloaf-container";
         }
 
-        const threadloafContainer = document.createElement("div");
-        threadloafContainer.id = "threadloaf-container";
-
-        // Create a separate container for thread content
+        // Create a new container for thread content
         const threadContent = document.createElement("div");
         threadContent.id = "threadloaf-content";
-        threadloafContainer.appendChild(threadContent);
+
+        // Build the new DOM tree
+        const newThreadloafContainer = document.createElement("div");
+        newThreadloafContainer.id = "threadloaf-container";
+        newThreadloafContainer.appendChild(threadContent);
 
         // Create floating toggle button
         const createFloatButton = (isThreadView: boolean) => {
@@ -309,13 +316,21 @@ export class ThreadRenderer {
 
         threadContent.appendChild(renderMessages(rootMessages));
 
-        // Hide original thread container and append custom UI
+        // Hide original thread container and append/update custom UI
         if (this.state.isThreadViewActive) {
             this.state.threadContainer.style.display = "none";
             const parentElement = this.state.threadContainer.parentElement;
             if (parentElement) {
                 parentElement.style.position = "relative";
-                parentElement.appendChild(threadloafContainer);
+
+                if (isNewContainer) {
+                    // First render - just append the new container
+                    parentElement.appendChild(newThreadloafContainer);
+                    this.domDiffer.clearTree();
+                } else {
+                    // Use nanomorph to update existing container
+                    this.domDiffer.morphTree(threadloafContainer!, newThreadloafContainer);
+                }
 
                 // First, handle expanded posts
                 if (expandedMessageId) {
@@ -353,6 +368,7 @@ export class ThreadRenderer {
             const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
                 existingContainer.remove();
+                this.domDiffer.clearTree();
             }
         }
 

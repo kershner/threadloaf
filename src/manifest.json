@@ -6,6 +6,10 @@
     "icons": {
         "128": "threadloaf-128.jpg"
     },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": "threadloaf-128.jpg"
+    },
     "permissions": [],
     "content_scripts": [
       {

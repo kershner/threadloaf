@@ -18,7 +18,7 @@
       }
     ],
     "web_accessible_resources": [{
-      "resources": ["styles.css", "threadloaf-128.jpg"],
+      "resources": ["styles.css", "threadloaf-128.jpg", "test-data/*"],
       "matches": ["*://discord.com/*"]
     }]
   }

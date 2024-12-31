@@ -21,7 +21,7 @@ export class MessageParser {
                 }
 
                 // Try to parse as a system message first
-                const systemContainer = contentsEl.querySelector('[class*="container_"][class*="compact_"]');
+                const systemContainer = contentsEl.querySelector('[class*="container_"]');
                 if (systemContainer) {
                     // This is a system message (like boosts, joins, etc)
                     const messageContent =
@@ -62,8 +62,8 @@ export class MessageParser {
                         ?.textContent?.trim();
                     timestampEl = headerEl.querySelector("time");
                 } else {
-                    // Cozy mode parsing - username is in a different location
-                    const messageWrapper = contentsEl.closest('[class*="cozyMessage_"]');
+                    // System messages (like changing the post topic) have a different structure.
+                    const messageWrapper = contentsEl.closest('[class*="systemMessage_"]');
                     if (messageWrapper) {
                         // First try to find username element directly
                         const usernameEl = messageWrapper.querySelector('[class*="username_"]');
@@ -91,13 +91,6 @@ export class MessageParser {
                 }
 
                 if (!author) {
-                    console.error("Failed to find author element. DOM structure:", {
-                        messageId: id,
-                        contentsHtml: contentsEl.outerHTML,
-                        wrapperHtml: contentsEl.closest('[class*="cozyMessage_"]')?.outerHTML,
-                        labelledBy: contentsEl.closest('[class*="cozyMessage_"]')?.getAttribute("aria-labelledby"),
-                        threadHtml: threadContainer?.innerHTML,
-                    });
                     throw new Error("Failed to find author element");
                 }
 

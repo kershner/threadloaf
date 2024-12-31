@@ -1,11 +1,11 @@
 import { DomParser } from "./DomParser";
-import { MessageInfo } from "./MessageInfo";
 import { MessageParser } from "./MessageParser";
 import { MessageTreeBuilder } from "./MessageTreeBuilder";
 import { ThreadloafState } from "./ThreadloafState";
 import { ThreadRenderer } from "./ThreadRenderer";
 import { Threadloaf } from "./Threadloaf";
 import { DomMutator } from "./DomMutator";
+import { runTests } from "./runTests";
 
 (function () {
     const state = new ThreadloafState();
@@ -15,4 +15,7 @@ import { DomMutator } from "./DomMutator";
     const domParser = new DomParser(domMutator, state);
     const threadRenderer = new ThreadRenderer(state, domParser, domMutator, messageParser, messageTreeBuilder);
     new Threadloaf(state, domParser, domMutator, threadRenderer);
+
+    // Uncomment to run tests.
+    runTests();
 })();

@@ -20,7 +20,7 @@ jobs:
         
     - name: Install dependencies
       working-directory: ./src
-      run: npm install -g typescript && npm install
+      run: npm install
       
     - name: Build extension
       working-directory: ./src

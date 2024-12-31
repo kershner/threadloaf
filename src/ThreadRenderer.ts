@@ -184,7 +184,7 @@ export class ThreadRenderer {
         createFloatButton(this.state.isThreadViewActive);
 
         // Parse messages and build tree
-        const rawMessages = this.messageParser.parseMessages();
+        const rawMessages = this.messageParser.parseMessages(this.state.threadContainer);
 
         // Build the tree (which includes coalescing)
         const rootMessages = this.messageTreeBuilder.buildMessageTree(rawMessages);

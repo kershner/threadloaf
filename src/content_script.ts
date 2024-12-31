@@ -9,7 +9,7 @@ import { DomMutator } from "./DomMutator";
 
 (function () {
     const state = new ThreadloafState();
-    const messageParser = new MessageParser(state);
+    const messageParser = new MessageParser();
     const messageTreeBuilder = new MessageTreeBuilder();
     const domMutator = new DomMutator(state);
     const domParser = new DomParser(domMutator, state);

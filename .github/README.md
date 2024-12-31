@@ -18,7 +18,7 @@ Threadloaf is a Chrome extension that enhances Discord's thread view with a more
 
 1. Install the extension from the Chrome Web Store (link coming soon)
 2. Visit Discord in your Chrome browser
-3. Look for the "Chat/Thread" toggle button at the bottom of any channel
+3. Look for the "Chat/Thread" toggle button at the top of any channel
 
 ## Usage
 

@@ -1,7 +1,8 @@
-/// <reference path="./DomParser.ts" />
-/// <reference path="./MessageInfo.ts" />
-/// <reference path="./ThreadloafState.ts" />
-/// <reference path="./ThreadRenderer.ts" />
+import { DomParser } from "./DomParser";
+import { MessageInfo } from "./MessageInfo";
+import { ThreadloafState } from "./ThreadloafState";
+import { ThreadRenderer } from "./ThreadRenderer";
+import { DomMutator } from "./DomMutator";
 
 /**
  * Main entry point and controller for the Threadloaf extension.
@@ -10,7 +11,7 @@
  * of the application. Handles setup of keyboard navigation and polling
  * for Discord's dynamic content loading.
  */
-class Threadloaf {
+export class Threadloaf {
     private state: ThreadloafState;
     private domParser: DomParser;
     private domMutator: DomMutator;

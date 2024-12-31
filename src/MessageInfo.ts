@@ -1,4 +1,4 @@
-interface MessageInfo {
+export interface MessageInfo {
     id: string;
     author: string;
     timestamp: number; // Unix timestamp in milliseconds

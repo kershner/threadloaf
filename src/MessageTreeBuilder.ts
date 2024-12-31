@@ -1,4 +1,4 @@
-/// <reference path="./MessageInfo.ts" />
+import { MessageInfo } from "./MessageInfo";
 
 /**
  * Constructs hierarchical message trees from flat message lists.
@@ -6,7 +6,7 @@
  * building a tree structure that represents message threading,
  * and handling missing messages in the conversation chain.
  */
-class MessageTreeBuilder {
+export class MessageTreeBuilder {
     // Build a hierarchical message tree
     public buildMessageTree(messages: MessageInfo[]): MessageInfo[] {
         // Sort messages chronologically for processing

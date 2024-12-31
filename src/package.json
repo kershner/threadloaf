@@ -1,10 +1,12 @@
 {
   "scripts": {
-    "build": "npm run format && tsc && cp -f manifest.json styles.css threadloaf-128.jpg ../dist/",
+    "build": "npm run format && npm run bundle && cp -f manifest.json styles.css threadloaf-128.jpg ../dist/",
+    "bundle": "esbuild content_script.ts --bundle --outfile=../dist/content_script.js --format=iife --platform=browser --sourcemap",
     "format": "prettier --write \"**/*.ts\""
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
+    "esbuild": "^0.20.1",
     "prettier": "^3.4.2",
     "typescript": "^5.3.3"
   }

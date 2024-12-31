@@ -1,10 +1,17 @@
+import { ThreadloafState } from "./ThreadloafState";
+import { DomParser } from "./DomParser";
+import { DomMutator } from "./DomMutator";
+import { MessageParser } from "./MessageParser";
+import { MessageTreeBuilder } from "./MessageTreeBuilder";
+import { MessageInfo } from "./MessageInfo";
+
 /**
  * Manages the rendering of threaded message views in the Discord interface.
  * Responsible for creating and updating the thread UI, handling message
  * expansion/collapse, managing the load more button, and coordinating
  * between the message tree structure and DOM representation.
  */
-class ThreadRenderer {
+export class ThreadRenderer {
     private state: ThreadloafState;
     private domParser: DomParser;
     private domMutator: DomMutator;

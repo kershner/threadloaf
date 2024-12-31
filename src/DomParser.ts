@@ -1,5 +1,5 @@
-/// <reference path="./DomMutator.ts" />
-/// <reference path="./ThreadloafState.ts" />
+import { DomMutator } from "./DomMutator";
+import { ThreadloafState } from "./ThreadloafState";
 
 /*
  * IMPORTANT: Discord Class/ID Naming Pattern
@@ -23,7 +23,7 @@
  * to track DOM changes, and providing methods to locate message containers
  * and other important Discord UI components.
  */
-class DomParser {
+export class DomParser {
     private domMutator: DomMutator;
     private state: ThreadloafState;
 

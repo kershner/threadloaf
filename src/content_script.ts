@@ -1,10 +1,11 @@
-/// <reference path="./DomParser.ts" />
-/// <reference path="./MessageInfo.ts" />
-/// <reference path="./MessageParser.ts" />
-/// <reference path="./MessageTreeBuilder.ts" />
-/// <reference path="./ThreadloafState.ts" />
-/// <reference path="./ThreadRenderer.ts" />
-/// <reference path="./Threadloaf.ts" />
+import { DomParser } from "./DomParser";
+import { MessageInfo } from "./MessageInfo";
+import { MessageParser } from "./MessageParser";
+import { MessageTreeBuilder } from "./MessageTreeBuilder";
+import { ThreadloafState } from "./ThreadloafState";
+import { ThreadRenderer } from "./ThreadRenderer";
+import { Threadloaf } from "./Threadloaf";
+import { DomMutator } from "./DomMutator";
 
 (function () {
     const state = new ThreadloafState();

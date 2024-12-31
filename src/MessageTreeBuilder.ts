@@ -34,30 +34,8 @@ export class MessageTreeBuilder {
                 if (parent) {
                     parent.children?.push(message);
                 } else {
-                    // Create ghost message for missing parent
-                    /*
-                     * IMPORTANT: Discord messages are ALWAYS rich HTML content that must be rendered properly.
-                     * Never display raw HTML to users. The content and htmlContent fields contain Discord's
-                     * rich message HTML which includes formatted text, emojis, images, and other rich content.
-                     *
-                     * When creating a ghost message:
-                     * - content: Used for generating the preview text (will be parsed to extract plain text)
-                     * - htmlContent: Used for the expanded view (must be rendered as HTML)
-                     *
-                     * Both fields should contain the same HTML from the parent preview to ensure consistent
-                     * rendering in both preview and expanded states.
-                     */
-                    const ghostMessage: MessageInfo = {
-                        id: message.parentId,
-                        author: message.parentPreview?.author || "Unknown",
-                        timestamp: message.timestamp - 1,
-                        content: message.parentPreview?.content || "Message not loaded",
-                        htmlContent: message.parentPreview?.content || "Message not loaded",
-                        children: [message],
-                        isGhost: true,
-                    };
-                    idToMessage.set(message.parentId, ghostMessage);
-                    rootMessages.push(ghostMessage);
+                    // Skip messages whose parents are not loaded
+                    continue;
                 }
                 continue;
             }

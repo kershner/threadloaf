@@ -51,9 +51,6 @@ export class DomMutator {
     ): HTMLElement {
         const el = document.createElement("div");
         el.classList.add("threadloaf-message");
-        if (message.isGhost) {
-            el.classList.add("ghost-message");
-        }
         if (message.isError) {
             el.dataset.isError = "true";
         }
@@ -66,50 +63,31 @@ export class DomMutator {
         const contentPreview = document.createElement("span");
         contentPreview.classList.add("message-content", "preview");
 
-        // For non-ghost messages, handle emojis specially
-        if (!message.isGhost) {
-            // Create a temporary container to parse the content
-            const temp = document.createElement("div");
-            temp.innerHTML = message.htmlContent;
+        // Handle emojis specially
+        // Create a temporary container to parse the content
+        const temp = document.createElement("div");
+        temp.innerHTML = message.htmlContent;
 
-            // Remove reactions
-            temp.querySelectorAll('[class*="reactions_"]').forEach((el) => el.remove());
+        // Remove reactions
+        temp.querySelectorAll('[class*="reactions_"]').forEach((el) => el.remove());
 
-            // Replace emoji images with their alt text
-            temp.querySelectorAll('img[class*="emoji"]').forEach((img) => {
-                if (img instanceof HTMLImageElement) {
-                    const text = img.alt || img.getAttribute("aria-label") || "";
-                    if (text) {
-                        img.replaceWith(text);
-                    }
+        // Replace emoji images with their alt text
+        temp.querySelectorAll('img[class*="emoji"]').forEach((img) => {
+            if (img instanceof HTMLImageElement) {
+                const text = img.alt || img.getAttribute("aria-label") || "";
+                if (text) {
+                    img.replaceWith(text);
                 }
-            });
+            }
+        });
 
-            // Replace <br> and block-level elements with spaces
-            temp.querySelectorAll("br, p, div").forEach((el) => {
-                el.replaceWith(" " + (el.textContent || "") + " ");
-            });
+        // Replace <br> and block-level elements with spaces
+        temp.querySelectorAll("br, p, div").forEach((el) => {
+            el.replaceWith(" " + (el.textContent || "") + " ");
+        });
 
-            // Get text and normalize whitespace
-            contentPreview.textContent = temp.textContent?.replace(/\s+/g, " ").trim() || "";
-        } else {
-            /*
-             * IMPORTANT: Ghost message preview handling
-             *
-             * Ghost messages contain Discord's rich HTML content from the parent preview.
-             * We must parse this HTML properly to extract plain text for the preview.
-             *
-             * 1. Create a temporary container and set its HTML content
-             * 2. Extract and normalize the text content
-             * 3. Never display raw HTML in the preview
-             *
-             * This ensures consistent handling with regular messages while maintaining
-             * proper text extraction from HTML content.
-             */
-            const temp = document.createElement("div");
-            temp.innerHTML = message.content; // Parse the HTML safely
-            contentPreview.textContent = temp.textContent?.replace(/\s+/g, " ").trim() || "Message not loaded";
-        }
+        // Get text and normalize whitespace
+        contentPreview.textContent = temp.textContent?.replace(/\s+/g, " ").trim() || "";
 
         contentPreview.style.color = color;
         if (isBold) {
@@ -125,11 +103,9 @@ export class DomMutator {
         authorSpan.textContent = message.author;
 
         previewContainer.appendChild(contentPreview);
-        // Only add separator and author if we have an author (empty ghost messages don't)
-        if (message.author) {
-            previewContainer.appendChild(separator);
-            previewContainer.appendChild(authorSpan);
-        }
+
+        previewContainer.appendChild(separator);
+        previewContainer.appendChild(authorSpan);
 
         // Full content container (shown when expanded)
         const fullContentContainer = document.createElement("div");
@@ -322,31 +298,11 @@ export class DomMutator {
         const embedsContainer = document.createElement("div");
         embedsContainer.classList.add("embeds-container");
 
-        // Move embeds from messageContent to embedsContainer
+        // Add embeds from messageContent to embedsContainer
         const embedLinks = messageContent.querySelector(".embed-links");
         if (embedLinks) {
             messageContent.removeChild(embedLinks);
             embedsContainer.appendChild(embedLinks);
-        }
-
-        // Add ghost notice if this is a ghost message
-        if (message.isGhost) {
-            const ghostNotice = document.createElement("div");
-            ghostNotice.classList.add("ghost-notice");
-            ghostNotice.textContent = "Full message not loaded";
-
-            // Create a ghost content wrapper
-            const ghostContent = document.createElement("div");
-            ghostContent.classList.add("ghost-content");
-
-            // Move the message content into the ghost content wrapper
-            // This preserves the HTML rendering while applying ghost styling
-            const existingContent = messageContent.innerHTML;
-            messageContent.innerHTML = "";
-            ghostContent.innerHTML = existingContent;
-
-            messageContent.appendChild(ghostContent);
-            messageContent.appendChild(ghostNotice);
         }
 
         fullContentContainer.appendChild(embedsContainer);

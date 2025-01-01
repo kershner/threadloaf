@@ -45,6 +45,19 @@ export class ThreadRenderer {
         const expandedMessageRect = expandedMessage?.getBoundingClientRect();
         const expandedMessageViewportOffset = expandedMessageRect ? expandedMessageRect.top : null;
 
+        // If no expanded message, store position of most recent non-expanded message
+        let recentMessageId: string | null = null;
+        let recentMessageViewportOffset: number | null = null;
+        if (!expandedMessage && existingThreadContent) {
+            const allMessages = Array.from(existingThreadContent.querySelectorAll(".threadloaf-message"));
+            const mostRecentMessage = allMessages[allMessages.length - 1] as HTMLElement;
+            if (mostRecentMessage) {
+                recentMessageId = mostRecentMessage.getAttribute("data-msg-id");
+                const rect = mostRecentMessage.getBoundingClientRect();
+                recentMessageViewportOffset = rect.top;
+            }
+        }
+
         // Check if we're at the top of the thread
         this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
 
@@ -349,6 +362,17 @@ export class ThreadRenderer {
                             if (scrollContainer) {
                                 scrollContainer.scrollTop += currentOffset - expandedMessageViewportOffset;
                             }
+                        }
+                    }
+                } else if (recentMessageId && recentMessageViewportOffset !== null) {
+                    // Restore position of most recent message
+                    const recentMessage = document.querySelector(`[data-msg-id="${recentMessageId}"]`) as HTMLElement;
+                    if (recentMessage) {
+                        const newRect = recentMessage.getBoundingClientRect();
+                        const currentOffset = newRect.top;
+                        const scrollContainer = document.getElementById("threadloaf-content");
+                        if (scrollContainer) {
+                            scrollContainer.scrollTop += currentOffset - recentMessageViewportOffset;
                         }
                     }
                 } else if (!existingThreadContent) {

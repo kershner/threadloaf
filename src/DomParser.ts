@@ -97,14 +97,6 @@ export class DomParser {
                 if (newThreadContainer) {
                     this.state.threadContainer = newThreadContainer;
                     renderThread();
-
-                    // Only scroll to bottom if we're in thread view AND we're not loading more messages
-                    if (this.state.isThreadViewActive && !this.state.isLoadingMore) {
-                        const threadContent = document.getElementById("threadloaf-content");
-                        if (threadContent) {
-                            threadContent.scrollTop = threadContent.scrollHeight;
-                        }
-                    }
                 }
             }
         });

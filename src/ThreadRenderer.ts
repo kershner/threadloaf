@@ -43,12 +43,14 @@ export class ThreadRenderer {
         const existingThreadContent = document.getElementById("threadloaf-content");
         const scrollTop = existingThreadContent?.scrollTop || 0;
 
-        // Check if we're at the top of the thread
-        this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
-
-        // Store currently expanded message ID before re-render
+        // Store currently expanded message and its position relative to viewport
         const expandedMessage = document.querySelector(".threadloaf-message.expanded");
         const expandedMessageId = expandedMessage?.getAttribute("data-msg-id");
+        const expandedMessageRect = expandedMessage?.getBoundingClientRect();
+        const expandedMessageViewportOffset = expandedMessageRect ? expandedMessageRect.top : null;
+
+        // Check if we're at the top of the thread
+        this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
 
         // Get existing container or create new one
         let threadloafContainer = document.getElementById("threadloaf-container");
@@ -344,6 +346,16 @@ export class ThreadRenderer {
                         const fullContentContainer = messageToExpand.querySelector(".full-content") as HTMLElement;
                         if (previewContainer) previewContainer.style.display = "none";
                         if (fullContentContainer) fullContentContainer.style.display = "block";
+
+                        // Restore expanded message's position relative to viewport
+                        if (expandedMessageViewportOffset !== null) {
+                            const newRect = messageToExpand.getBoundingClientRect();
+                            const currentOffset = newRect.top;
+                            const scrollContainer = document.getElementById("threadloaf-content");
+                            if (scrollContainer) {
+                                scrollContainer.scrollTop += currentOffset - expandedMessageViewportOffset;
+                            }
+                        }
                     }
                 } else if (!existingThreadContent) {
                     // Only expand first post if this is the initial render (no existing content)
@@ -357,10 +369,13 @@ export class ThreadRenderer {
                     }
                 }
 
-                // Then restore scroll position with zero timeout
-                setTimeout(() => {
-                    this.scrollToNewestMessage();
-                }, 0);
+                // Don't auto-scroll to newest message after mutations
+                // Only scroll if this is the initial render or user explicitly requests it
+                if (!existingThreadContent) {
+                    setTimeout(() => {
+                        this.scrollToNewestMessage();
+                    }, 0);
+                }
             }
         } else {
             this.state.threadContainer.style.display = "block";

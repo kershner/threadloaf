@@ -69,24 +69,59 @@ export class DomParser {
             let shouldRerender = false;
 
             for (const mutation of mutations) {
+                console.log("Mutation detected:", {
+                    type: mutation.type,
+                    target: mutation.target,
+                    addedNodes: mutation.addedNodes,
+                    removedNodes: mutation.removedNodes,
+                });
+
                 // Check for new messages
                 const hasNewMessages = Array.from(mutation.addedNodes).some(
                     (node) =>
                         node instanceof HTMLElement &&
                         (node.matches('li[id^="chat-messages-"]') || node.querySelector('li[id^="chat-messages-"]')),
                 );
+                if (hasNewMessages) {
+                    console.log("New message detected");
+                }
 
-                // Check for reactions changes
-                const hasReactionChanges =
-                    (mutation.target instanceof HTMLElement && mutation.target.matches('[class*="reactions_"]')) ||
-                    (mutation.target instanceof HTMLElement && mutation.target.closest('[class*="reactions_"]'));
+                // Check for reactions changes - handle both cozy and compact modes
+                const hasReactionChanges = (() => {
+                    if (!(mutation.target instanceof HTMLElement)) {
+                        console.log("Mutation target is not an HTMLElement");
+                        return false;
+                    }
+
+                    // First find the containing message li element
+                    const messageLi = mutation.target.closest('li[id^="chat-messages-"]');
+                    if (!messageLi) {
+                        console.log("No containing message li found");
+                        return false;
+                    }
+
+                    // Check if the mutation affects a reactions container anywhere within this message
+                    const reactionContainer = messageLi.querySelector('[class*="reactions_"]');
+                    console.log("Reaction container search:", {
+                        found: !!reactionContainer,
+                        container: reactionContainer,
+                    });
+                    return !!reactionContainer;
+                })();
+                if (hasReactionChanges) {
+                    console.log("Reaction change detected");
+                }
 
                 // Check for message content edits
                 const hasMessageEdits =
                     (mutation.target instanceof HTMLElement && mutation.target.matches('[id^="message-content-"]')) ||
                     (mutation.target instanceof HTMLElement && mutation.target.closest('[id^="message-content-"]'));
+                if (hasMessageEdits) {
+                    console.log("Message edit detected");
+                }
 
                 if (hasNewMessages || hasReactionChanges || hasMessageEdits) {
+                    console.log("Should rerender due to:", { hasNewMessages, hasReactionChanges, hasMessageEdits });
                     shouldRerender = true;
                     break;
                 }
@@ -96,7 +131,10 @@ export class DomParser {
                 const newThreadContainer = this.findThreadContainer();
                 if (newThreadContainer) {
                     this.state.threadContainer = newThreadContainer;
+                    console.log("Triggering rerender");
                     renderThread();
+                } else {
+                    console.log("Thread container not found after mutation");
                 }
             }
         });

@@ -4,7 +4,6 @@ import { DomMutator } from "./DomMutator";
 import { MessageParser } from "./MessageParser";
 import { MessageTreeBuilder } from "./MessageTreeBuilder";
 import { MessageInfo } from "./MessageInfo";
-import { DomDiffer } from "./DomDiffer";
 
 /**
  * Manages the rendering of threaded message views in the Discord interface.
@@ -18,7 +17,6 @@ export class ThreadRenderer {
     private domMutator: DomMutator;
     private messageParser: MessageParser;
     private messageTreeBuilder: MessageTreeBuilder;
-    private domDiffer: DomDiffer;
 
     constructor(
         state: ThreadloafState,
@@ -32,7 +30,6 @@ export class ThreadRenderer {
         this.domMutator = domMutator;
         this.messageParser = messageParser;
         this.messageTreeBuilder = messageTreeBuilder;
-        this.domDiffer = new DomDiffer();
     }
 
     // Render the thread UI
@@ -328,10 +325,8 @@ export class ThreadRenderer {
                 if (isNewContainer) {
                     // First render - just append the new container
                     parentElement.appendChild(newThreadloafContainer);
-                    this.domDiffer.clearTree();
                 } else {
-                    // Use nanomorph to update existing container
-                    this.domDiffer.morphTree(threadloafContainer!, newThreadloafContainer);
+                    threadloafContainer!.replaceWith(newThreadloafContainer);
                 }
 
                 // First, handle expanded posts
@@ -383,7 +378,6 @@ export class ThreadRenderer {
             const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
                 existingContainer.remove();
-                this.domDiffer.clearTree();
             }
         }
 

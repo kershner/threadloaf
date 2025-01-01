@@ -383,11 +383,11 @@ export class ThreadRenderer {
                 }
 
                 // Check if we have a pending scroll to newest
-                if (this.state.pendingScrollToNewest !== null) {
-                    setTimeout(() => {
-                        this.scrollToNewestMessage(this.state.pendingScrollToNewest!.shouldExpand);
-                    }, 0);
-                }
+                setTimeout(() => {
+                    if (this.state.pendingScrollToNewest !== null) {
+                        this.scrollToNewestMessage(this.state.pendingScrollToNewest.shouldExpand);
+                    }
+                }, 0);
             }
         } else {
             this.state.threadContainer.style.display = "block";

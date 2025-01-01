@@ -38,7 +38,6 @@ export class ThreadRenderer {
 
         // Store scroll position before re-render
         const existingThreadContent = document.getElementById("threadloaf-content");
-        const scrollTop = existingThreadContent?.scrollTop || 0;
 
         // Store currently expanded message and its position relative to viewport
         const expandedMessage = document.querySelector(".threadloaf-message.expanded");
@@ -353,22 +352,16 @@ export class ThreadRenderer {
                         }
                     }
                 } else if (!existingThreadContent) {
-                    // Only expand first post if this is the initial render (no existing content)
-                    const firstMessage = document.querySelector(".threadloaf-message") as HTMLElement;
-                    if (firstMessage) {
-                        firstMessage.classList.add("expanded");
-                        const previewContainer = firstMessage.querySelector(".preview-container") as HTMLElement;
-                        const fullContentContainer = firstMessage.querySelector(".full-content") as HTMLElement;
-                        if (previewContainer) previewContainer.style.display = "none";
-                        if (fullContentContainer) fullContentContainer.style.display = "block";
-                    }
+                    // Scroll to newest message on initial render without expanding it
+                    setTimeout(() => {
+                        this.scrollToNewestMessage(false);
+                    }, 0);
                 }
 
-                // Don't auto-scroll to newest message after mutations
-                // Only scroll if this is the initial render or user explicitly requests it
-                if (!existingThreadContent) {
+                // Check if we have a pending scroll to newest
+                if (this.state.pendingScrollToNewest !== null) {
                     setTimeout(() => {
-                        this.scrollToNewestMessage();
+                        this.scrollToNewestMessage(this.state.pendingScrollToNewest!.shouldExpand);
                     }, 0);
                 }
             }
@@ -436,12 +429,6 @@ export class ThreadRenderer {
             if (wasInThreadView) {
                 this.state.isThreadViewActive = true;
                 this.renderThread();
-
-                // After rendering, scroll to top of thread view
-                const threadContent = document.getElementById("threadloaf-content");
-                if (threadContent) {
-                    threadContent.scrollTop = 0;
-                }
             }
 
             // Re-enable after a delay
@@ -521,6 +508,11 @@ export class ThreadRenderer {
 
             // Scroll to show it (without animation)
             newestMessage.scrollIntoView({ behavior: "auto", block: "center" });
+            // Clear any pending scroll
+            this.state.pendingScrollToNewest = null;
+        } else {
+            // Message not found, set flag to try again later
+            this.state.pendingScrollToNewest = { shouldExpand };
         }
     }
 }

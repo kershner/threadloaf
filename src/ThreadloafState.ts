@@ -12,4 +12,5 @@ export class ThreadloafState {
     public isTopLoaded: boolean = false;
     public isLoadingMore: boolean = false;
     public newestMessageId: string | null = null;
+    public pendingScrollToNewest: { shouldExpand: boolean } | null = null;
 }

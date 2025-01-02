@@ -221,13 +221,11 @@ export class DomMutator {
         replyButton.textContent = "Actions";
         replyButton.onclick = (e) => {
             e.stopPropagation(); // Prevent collapsing when clicking actions
-            console.log("Actions button clicked");
 
             if (!message.originalElement) {
                 console.error("No original element reference found for message");
                 return;
             }
-            console.log("Found original message:", message.originalElement);
 
             // Try to trigger context menu on each ancestor until one responds
             let currentElement: Element | null = message.originalElement.querySelector('[id^="message-content-"]');
@@ -235,7 +233,6 @@ export class DomMutator {
                 console.error("Message content element not found in:", message.originalElement);
                 return;
             }
-            console.log("Starting from content element:", currentElement);
 
             // Set up menu positioning style before triggering context menu
             const buttonRect = replyButton.getBoundingClientRect();
@@ -257,8 +254,21 @@ export class DomMutator {
                 }
             `;
 
+            // Set up a mutation observer to watch for the menu being removed
+            const observer = new MutationObserver((mutations) => {
+                // Does div.menu_* still exist on the page?
+                const menuExists = document.querySelector('div[class*="menu_"]');
+                if (!menuExists) {
+                    // Menu was removed, clean up our styles
+                    styleEl.remove();
+                    observer.disconnect();
+                }
+            });
+
+            // Start observing the document body for removed nodes
+            observer.observe(document.body, { childList: true, subtree: true });
+
             while (currentElement && currentElement !== message.originalElement.parentElement) {
-                console.log("Trying context menu on element:", currentElement);
                 const contextEvent = new MouseEvent("contextmenu", {
                     bubbles: true,
                     cancelable: true,
@@ -268,14 +278,11 @@ export class DomMutator {
                 });
 
                 const wasHandled = !currentElement.dispatchEvent(contextEvent);
-                console.log("Context menu event was handled:", wasHandled);
 
                 if (wasHandled) {
-                    console.log("Context menu event was handled by element:", currentElement);
                     break;
                 }
                 currentElement = currentElement.parentElement;
-                console.log("Moving to parent element:", currentElement);
             }
         };
 

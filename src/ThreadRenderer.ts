@@ -4,7 +4,6 @@ import { DomMutator } from "./DomMutator";
 import { MessageParser } from "./MessageParser";
 import { MessageTreeBuilder } from "./MessageTreeBuilder";
 import { MessageInfo } from "./MessageInfo";
-import { DomDiffer } from "./DomDiffer";
 
 /**
  * Manages the rendering of threaded message views in the Discord interface.
@@ -18,7 +17,6 @@ export class ThreadRenderer {
     private domMutator: DomMutator;
     private messageParser: MessageParser;
     private messageTreeBuilder: MessageTreeBuilder;
-    private domDiffer: DomDiffer;
 
     constructor(
         state: ThreadloafState,
@@ -32,7 +30,6 @@ export class ThreadRenderer {
         this.domMutator = domMutator;
         this.messageParser = messageParser;
         this.messageTreeBuilder = messageTreeBuilder;
-        this.domDiffer = new DomDiffer();
     }
 
     // Render the thread UI
@@ -41,14 +38,28 @@ export class ThreadRenderer {
 
         // Store scroll position before re-render
         const existingThreadContent = document.getElementById("threadloaf-content");
-        const scrollTop = existingThreadContent?.scrollTop || 0;
+
+        // Store currently expanded message and its position relative to viewport
+        const expandedMessage = document.querySelector(".threadloaf-message.expanded");
+        const expandedMessageId = expandedMessage?.getAttribute("data-msg-id");
+        const expandedMessageRect = expandedMessage?.getBoundingClientRect();
+        const expandedMessageViewportOffset = expandedMessageRect ? expandedMessageRect.top : null;
+
+        // If no expanded message, store position of most recent non-expanded message
+        let recentMessageId: string | null = null;
+        let recentMessageViewportOffset: number | null = null;
+        if (!expandedMessage && existingThreadContent) {
+            const allMessages = Array.from(existingThreadContent.querySelectorAll(".threadloaf-message"));
+            const mostRecentMessage = allMessages[allMessages.length - 1] as HTMLElement;
+            if (mostRecentMessage) {
+                recentMessageId = mostRecentMessage.getAttribute("data-msg-id");
+                const rect = mostRecentMessage.getBoundingClientRect();
+                recentMessageViewportOffset = rect.top;
+            }
+        }
 
         // Check if we're at the top of the thread
         this.state.isTopLoaded = this.domParser.checkIfTopLoaded();
-
-        // Store currently expanded message ID before re-render
-        const expandedMessage = document.querySelector(".threadloaf-message.expanded");
-        const expandedMessageId = expandedMessage?.getAttribute("data-msg-id");
 
         // Get existing container or create new one
         let threadloafContainer = document.getElementById("threadloaf-container");
@@ -332,10 +343,8 @@ export class ThreadRenderer {
                 if (isNewContainer) {
                     // First render - just append the new container
                     parentElement.appendChild(newThreadloafContainer);
-                    this.domDiffer.clearTree();
                 } else {
-                    // Use nanomorph to update existing container
-                    this.domDiffer.morphTree(threadloafContainer!, newThreadloafContainer);
+                    threadloafContainer!.replaceWith(newThreadloafContainer);
                 }
 
                 // First, handle expanded posts
@@ -350,22 +359,40 @@ export class ThreadRenderer {
                         const fullContentContainer = messageToExpand.querySelector(".full-content") as HTMLElement;
                         if (previewContainer) previewContainer.style.display = "none";
                         if (fullContentContainer) fullContentContainer.style.display = "block";
+
+                        // Restore expanded message's position relative to viewport
+                        if (expandedMessageViewportOffset !== null) {
+                            const newRect = messageToExpand.getBoundingClientRect();
+                            const currentOffset = newRect.top;
+                            const scrollContainer = document.getElementById("threadloaf-content");
+                            if (scrollContainer) {
+                                scrollContainer.scrollTop += currentOffset - expandedMessageViewportOffset;
+                            }
+                        }
+                    }
+                } else if (recentMessageId && recentMessageViewportOffset !== null) {
+                    // Restore position of most recent message
+                    const recentMessage = document.querySelector(`[data-msg-id="${recentMessageId}"]`) as HTMLElement;
+                    if (recentMessage) {
+                        const newRect = recentMessage.getBoundingClientRect();
+                        const currentOffset = newRect.top;
+                        const scrollContainer = document.getElementById("threadloaf-content");
+                        if (scrollContainer) {
+                            scrollContainer.scrollTop += currentOffset - recentMessageViewportOffset;
+                        }
                     }
                 } else if (!existingThreadContent) {
-                    // Only expand first post if this is the initial render (no existing content)
-                    const firstMessage = document.querySelector(".threadloaf-message") as HTMLElement;
-                    if (firstMessage) {
-                        firstMessage.classList.add("expanded");
-                        const previewContainer = firstMessage.querySelector(".preview-container") as HTMLElement;
-                        const fullContentContainer = firstMessage.querySelector(".full-content") as HTMLElement;
-                        if (previewContainer) previewContainer.style.display = "none";
-                        if (fullContentContainer) fullContentContainer.style.display = "block";
-                    }
+                    // Scroll to newest message on initial render without expanding it
+                    setTimeout(() => {
+                        this.scrollToNewestMessage(false);
+                    }, 0);
                 }
 
-                // Then restore scroll position with zero timeout
+                // Check if we have a pending scroll to newest
                 setTimeout(() => {
-                    this.scrollToNewestMessage();
+                    if (this.state.pendingScrollToNewest !== null) {
+                        this.scrollToNewestMessage(this.state.pendingScrollToNewest.shouldExpand);
+                    }
                 }, 0);
             }
         } else {
@@ -374,7 +401,6 @@ export class ThreadRenderer {
             const existingContainer = document.getElementById("threadloaf-container");
             if (existingContainer) {
                 existingContainer.remove();
-                this.domDiffer.clearTree();
             }
         }
 
@@ -433,12 +459,6 @@ export class ThreadRenderer {
             if (wasInThreadView) {
                 this.state.isThreadViewActive = true;
                 this.renderThread();
-
-                // After rendering, scroll to top of thread view
-                const threadContent = document.getElementById("threadloaf-content");
-                if (threadContent) {
-                    threadContent.scrollTop = 0;
-                }
             }
 
             // Re-enable after a delay
@@ -518,6 +538,11 @@ export class ThreadRenderer {
 
             // Scroll to show it (without animation)
             newestMessage.scrollIntoView({ behavior: "auto", block: "center" });
+            // Clear any pending scroll
+            this.state.pendingScrollToNewest = null;
+        } else {
+            // Message not found, set flag to try again later
+            this.state.pendingScrollToNewest = { shouldExpand };
         }
     }
 }

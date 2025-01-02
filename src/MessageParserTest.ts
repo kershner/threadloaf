@@ -292,6 +292,60 @@ export class MessageParserTest {
                     ]);
                 },
             },
+            {
+                name: "parse cozy-double-post.html",
+                fn: async () => {
+                    deepEqual(this.parser.parseMessages(await this.loadTestFile("cozy-double-post.html")), [
+                        {
+                            id: "1323826029218762773",
+                            author: "electroly",
+                            timestamp: 1735695120864,
+                            content: "test 1",
+                            htmlContent:
+                                '<div id="message-content-1323826029218762773" class="markup_f8f345 messageContent_f9f2ca"><span>test 1</span></div>',
+                            children: [],
+                            originalElement: IGNORE,
+                        },
+                        {
+                            id: "1323826033287233627",
+                            author: "electroly",
+                            timestamp: 1735695121834,
+                            content: "test 2",
+                            htmlContent:
+                                '<div id="message-content-1323826033287233627" class="markup_f8f345 messageContent_f9f2ca"><span>test 2</span></div>',
+                            children: [],
+                            originalElement: IGNORE,
+                        },
+                    ]);
+                },
+            },
+            {
+                name: "parse compact-double-post.html",
+                fn: async () => {
+                    deepEqual(this.parser.parseMessages(await this.loadTestFile("compact-double-post.html")), [
+                        {
+                            id: "1323826029218762773",
+                            author: "electroly",
+                            timestamp: 1735695120864,
+                            content: "test 1",
+                            htmlContent:
+                                '<div id="message-content-1323826029218762773" class="markup_f8f345 messageContent_f9f2ca"><span>test 1</span></div>',
+                            children: [],
+                            originalElement: IGNORE,
+                        },
+                        {
+                            id: "1323826033287233627",
+                            author: "electroly",
+                            timestamp: 1735695121834,
+                            content: "test 2",
+                            htmlContent:
+                                '<div id="message-content-1323826033287233627" class="markup_f8f345 messageContent_f9f2ca"><span>test 2</span></div>',
+                            children: [],
+                            originalElement: IGNORE,
+                        },
+                    ]);
+                },
+            },
         ];
     }
 }

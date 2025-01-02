@@ -10,6 +10,7 @@ export class MessageParser {
     // Parse all messages in the thread container
     public parseMessages(threadContainer: HTMLElement | null): MessageInfo[] {
         if (!threadContainer) return [];
+        let lastAuthor: string | undefined;
 
         const messages = Array.from(threadContainer.querySelectorAll('li[id^="chat-messages-"]')).map((el) => {
             try {
@@ -77,19 +78,25 @@ export class MessageParser {
                 let timestampEl: Element | null = null;
 
                 if (headerEl) {
-                    // Standard compact mode parsing
+                    // Standard message parsing with header
                     author = headerEl
                         .querySelector('[id^="message-username-"] > span[class^="username_"]')
                         ?.textContent?.trim();
                     timestampEl = headerEl.querySelector("time");
+                    if (author) {
+                        lastAuthor = author;
+                    }
                 } else {
-                    // System messages (like changing the post topic) have a different structure.
+                    // Check for system messages first
                     const messageWrapper = contentsEl.closest('[class*="systemMessage_"]');
                     if (messageWrapper) {
                         // First try to find username element directly
                         const usernameEl = messageWrapper.querySelector('[class*="username_"]');
                         if (usernameEl) {
                             author = usernameEl.textContent?.trim();
+                            if (author) {
+                                lastAuthor = author;
+                            }
                         } else {
                             // For continuation messages, get username from aria-labelledby
                             const labelledBy = messageWrapper.getAttribute("aria-labelledby");
@@ -104,10 +111,17 @@ export class MessageParser {
                                         `#${usernameId} [class*="username_"]`,
                                     );
                                     author = referenceUsernameEl?.textContent?.trim();
+                                    if (author) {
+                                        lastAuthor = author;
+                                    }
                                 }
                             }
                         }
                         timestampEl = contentsEl.querySelector("time");
+                    } else {
+                        // Check for follow-up messages in cozy mode
+                        timestampEl = contentsEl.querySelector('span[class*="timestamp_"] time');
+                        author = lastAuthor;
                     }
                 }
 

@@ -3,6 +3,7 @@ import { MessageInfo } from "./MessageInfo";
 import { ThreadloafState } from "./ThreadloafState";
 import { ThreadRenderer } from "./ThreadRenderer";
 import { DomMutator } from "./DomMutator";
+import { DebouncedMutationObserver } from "./DebouncedMutationObserver";
 
 /**
  * Main entry point and controller for the Threadloaf extension.
@@ -73,14 +74,17 @@ export class Threadloaf {
         this.domMutator.findAndHideHeader();
 
         // Keep watching for header changes
-        this.state.headerObserver = new MutationObserver(() => {
-            this.domMutator.findAndHideHeader();
-        });
+        this.state.headerObserver = new DebouncedMutationObserver(
+            () => {
+                this.domMutator.findAndHideHeader();
+            },
+            {
+                childList: true,
+                subtree: true,
+            },
+        );
 
-        this.state.headerObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
+        this.state.headerObserver.observe(document.body);
     }
 
     private setupKeyboardNavigation(): void {
